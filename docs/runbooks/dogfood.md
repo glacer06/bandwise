@@ -37,7 +37,7 @@ The three dogfood hooks are wired in this repo's `.claude/settings.json`, all in
 
 ## Hosted mode (D2e)
 
-To move the hooks from your own key to app.bandwise.dev, follow [hosted-dogfood.md](hosted-dogfood.md) in order: migrations, the Vercel env, `bootstrap-internal` for the `internal` org and the `.bandwise/sets/` specs, the minted tokens, the checks, and the rollback plan. It marks which steps need PJ. The code is on PR #21; nothing is deployed as of 2026-10-01.
+To move the hooks from your own key to app.bandwise.dev, follow [hosted-dogfood.md](hosted-dogfood.md) in order: migrations, the Vercel env, `bootstrap-internal` for the `internal` org and the `.bandwise/sets/` specs, the minted tokens, the checks, and the rollback plan. It marks which steps need PJ. Hosted mode went live on 2026-10-05: the hooks on this repo call app.bandwise.dev with the run-only hook token, every set still in `shadow`.
 
 ## 1. Install
 
