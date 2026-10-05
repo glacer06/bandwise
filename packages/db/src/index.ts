@@ -4,6 +4,7 @@
 // scope from BandwiseDb (withTenant, withUser, withNoTenant) through the repositories.
 
 export { createDatabase, type CreateDatabaseOptions, type BandwiseDb } from "./client.js";
+export { connectionFailure, DbConnectionError, DbInvariantError, type DbConnectionFailure } from "./errors.js";
 export type { AnyTx, NoTenantTx, TenantTx, UserTx } from "./internal/drizzle.js";
 export {
   authRepositories,

@@ -7,7 +7,7 @@
 // unauthenticated or denied caller never makes the server read the body, and learns nothing
 // from validation errors.
 
-import { errorEnvelope, JsonValue, PointerChannel, RunOptions } from "@bandwise/core";
+import { errorEnvelope, errorType, JsonValue, PointerChannel, RunOptions } from "@bandwise/core";
 import type { TokenHasher } from "@bandwise/tenancy";
 import { z } from "zod";
 
@@ -48,8 +48,9 @@ export interface RunHttpResponse {
 
 function unexpected(e: unknown, requestId: string, log: ((message: string, requestId: string) => void) | undefined): RunHttpResponse {
   // Never echo or log an unexpected error's message: a database, env or provider error can quote
-  // the state or a secret. The log line names the error type and the request id.
-  log?.(e instanceof Error ? e.name : "unknown error", requestId);
+  // the state or a secret. The log line names the error type, its causes and their safe codes
+  // (core's errorType), and the request id: "DbConnectionError auth_failed < Error".
+  log?.(errorType(e), requestId);
   return { status: 503, body: errorEnvelope("system_one_unavailable", { message: "The run could not be completed.", requestId }) };
 }
 

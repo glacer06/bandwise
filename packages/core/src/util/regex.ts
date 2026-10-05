@@ -28,7 +28,9 @@ type Instr =
 /** Largest compiled program. Counted repetition expands, so this bounds the work per character. */
 export const MAX_PROGRAM_SIZE = 20_000;
 
-class PatternError extends Error {}
+class PatternError extends Error {
+  override readonly name = "PatternError";
+}
 
 function atomTest(source: string): (ch: string) => boolean {
   // Anchored to one code point, so the platform engine cannot backtrack over input.

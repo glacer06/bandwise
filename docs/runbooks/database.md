@@ -44,7 +44,35 @@ The app never connects as `postgres`. After the first migration, create a login 
 CREATE ROLE bandwise_console LOGIN INHERIT NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE IN ROLE bandwise_app;
 ```
 
-Then set its password with `\password bandwise_console` in `psql`, which prompts and never writes the password to a log or history. Generate the password in the team vault and keep it there. It goes from the vault into Vercel's `DATABASE_URL` for that environment, never into chat, a ticket or the repo. Through Supavisor the user name is `bandwise_console.<project-ref>`. Rotate it with `\password` and update Vercel.
+Then set its password with `\password bandwise_console` in `psql`, which prompts and never writes the password to a log or history. Generate the password in the team vault and keep it there. It goes from the vault into Vercel's `DATABASE_URL` for that environment, never into chat, a ticket or the repo. Through Supavisor the user name is `bandwise_console.<project-ref>`. To rotate it, follow the next section; do not change the password in place on a live deployment.
+
+### Rotate the app role's password
+
+A Postgres role has one password, and Supavisor checks it on every new connection. Change it in place and every deployment that still holds the old `DATABASE_URL` fails to open new connections, while the connections it already has keep working. So some runs fail and most do not, until the new deployment is live. That is what happened on 2026-10-05: `alter role bandwise_console with password` ran from the dashboard at 22:17:05 UTC, and two hook runs at 22:17:18 and 22:19:00 got `503` while the runs around them worked. Supavisor logged `ClientHandler: Exchange error: password authentication failed for user "bandwise_console"` for each one. Postgres logged nothing, because Supavisor checks the password itself.
+
+Rotate through a second login role instead, so a working password exists at every moment:
+
+1. Create the spare role once, with the same line as above but named `bandwise_console_b`. Set its new password with `\password bandwise_console_b` in `psql`, from the vault.
+2. Put the new string, user `bandwise_console_b.<project-ref>`, into Vercel's `DATABASE_URL` for that environment. Redeploy, and wait until the new deployment is the current one.
+3. Check one hook run answers 200, and the Supavisor log shows logins for `bandwise_console_b`.
+4. Only then lock the old role: `ALTER ROLE bandwise_console NOLOGIN;`. The next rotation goes the other way: new password on `bandwise_console`, `ALTER ROLE bandwise_console LOGIN;`, switch Vercel back, redeploy, then `NOLOGIN` on `bandwise_console_b`.
+
+If you must change the password in place, expect failed runs on new connections until the new deployment is live, and do it while hooks are idle.
+
+### When the run log says DbConnectionError
+
+The run route logs one line per unexpected failure, `run <requestId>: <type>`, with the error type and its causes but never a message. A database failure reads like `DbConnectionError auth_failed < Error`. The word after `DbConnectionError` says why the pool could not connect:
+
+| Code | Look at |
+|---|---|
+| `auth_failed` | The password in Vercel's `DATABASE_URL` does not match the role. Check the Supavisor (pooler) logs in the Supabase dashboard, source `supavisor_logs`, not the Postgres logs. A rotation still in progress is the usual cause. |
+| `too_many_connections` | Supavisor's client limit or Postgres `max_connections`. The console pool holds 3 connections per instance. |
+| `timeout` or `network` | Supabase status, the pooler host and port in `DATABASE_URL`, and the Supavisor logs. |
+| `unknown` | The Supavisor and Postgres logs at that minute. |
+
+A failed query inside a transaction reads like `DrizzleQueryError < DatabaseError 40P01`, with the SQLSTATE; that one is in the Postgres logs.
+
+The response to the caller is still `503 system_one_unavailable` with a fixed message, because api.md has no code for a database failure yet. Trust the log line, not the code, for the cause.
 
 ## Rollback
 

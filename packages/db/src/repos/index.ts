@@ -7,6 +7,7 @@ import { and, asc, desc, eq, getTableColumns, gt, gte, inArray, type InferInsert
 
 import type { Action, Band, Channel, ModelPrice, Page, PageReq, PointerChannel, ReviewItemKind, ReviewItemStatus, RunRecordSource, RunStatus, SystemOneProvider } from "@bandwise/core/contracts";
 
+import { DbInvariantError } from "../errors.js";
 import { type AnyTx, drizzleOf, type TenantTx, type UserTx } from "../internal/drizzle.js";
 import * as s from "../schema/index.js";
 
@@ -51,7 +52,7 @@ function organizationsRepo(opts: RepoOptions) {
         .insert(t)
         .values({ ...values, id: tx.orgId })
         .returning();
-      if (row === undefined) throw new Error("insert into organizations returned no row");
+      if (row === undefined) throw new DbInvariantError("insert into organizations returned no row");
       return row;
     },
     async update(tx: TenantTx, id: string, patch: Partial<Insert>): Promise<Row | null> {
@@ -93,7 +94,7 @@ function releasePointersRepo(opts: RepoOptions) {
         .insert(t)
         .values({ ...values, orgId: tx.orgId })
         .returning();
-      if (row === undefined) throw new Error("insert into release_pointers returned no row");
+      if (row === undefined) throw new DbInvariantError("insert into release_pointers returned no row");
       return row;
     },
     async update(
@@ -651,7 +652,7 @@ export function buildRepositories(opts: RepoOptions) {
         if (row !== undefined) return { claimed: true, row };
         const where = and(eq(t.actorKey, values.actorKey), eq(t.key, values.key));
         const [live] = await idempotencyKeys.findMany(tx, where, 1);
-        if (live === undefined) throw new Error("idempotency key conflict with no row");
+        if (live === undefined) throw new DbInvariantError("idempotency key conflict with no row");
         return { claimed: false, row: live };
       },
     },
@@ -899,7 +900,7 @@ export const platformRepositories = {
       )) as { rows: Array<{ outcome?: unknown }> };
       const outcome = result.rows[0]?.outcome;
       if (outcome !== "accepted" && outcome !== "rate_limited") {
-        throw new Error(`bandwise_early_access_submit returned ${String(outcome)}`);
+        throw new DbInvariantError(`bandwise_early_access_submit returned ${String(outcome)}`);
       }
       return outcome;
     },

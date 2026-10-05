@@ -59,7 +59,7 @@ Leave `BANDWISE_KEK`, `BANDWISE_JWT_SIGNING_KEY`, `OPENROUTER_API_KEY`, `AI_GATE
 
 Then redeploy production (Deployments, the latest production deployment, Redeploy), because env changes apply at the next deploy.
 
-**Check (Nick).** A run with no token must get 401. A 503 means a variable is missing or wrong: the function log shows `run <requestId>: Error` and nothing else, on purpose.
+**Check (Nick).** A run with no token must get 401. A 503 means a variable or the database is wrong. The function log shows `run <requestId>: <type>`, the error type and its causes and never a message, on purpose: `TokenPepperError` or `ServerEnvError` is a variable, `DbConnectionError auth_failed` is the database password (see [database.md](database.md), "When the run log says DbConnectionError").
 
 ```sh
 curl -s -o /dev/null -w "%{http_code}\n" -X POST https://app.bandwise.dev/api/v1/sets/done-check/run
@@ -190,7 +190,7 @@ printf 'header = "authorization: Bearer %s"\n' "$BANDWISE_TOKEN" | curl -sS --co
   | jq '{status, version, rollout, modelResolved, runBand, overallAction}'
 ```
 
-Expect `status: "ok"`, `version: 1`, `rollout: "shadow"` and `modelResolved: "jev-1.13.0"`. A `401` means the token or the pepper does not match; a `404` means the org is not `internal` or the set is not in the token's allowlist; a `503` is the env (section 2).
+Expect `status: "ok"`, `version: 1`, `rollout: "shadow"` and `modelResolved: "jev-1.13.0"`. A `401` means the token or the pepper does not match; a `404` means the org is not `internal` or the set is not in the token's allowlist; a `503` is the env or the database, and the function log line says which (section 2).
 
 Then the server's side, with the agent token:
 

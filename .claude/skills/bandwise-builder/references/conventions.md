@@ -57,6 +57,8 @@
 
 - Structured JSON logs with `requestId`, `orgId`, `setId`, `runId`.
 - Never log state, keys, or tokens. The log scrubber test enforces it.
+- An unexpected error logs `errorType(e)` from core: the name and a safe code of the error and of each cause, never a message (`DbConnectionError auth_failed < Error`, `DrizzleQueryError < DatabaseError 40P01`). Never log `e.name` alone or `e.message`.
+- Every error class sets `name` as a string literal (`override readonly name = "Refused"`). A constructor name does not survive a minified server bundle, and a class without a name logs as `Error`. `packages/db` names what leaves a transaction: `DbConnectionError` when the pool could not connect or `BEGIN` failed, drizzle's query error as `DrizzleQueryError`, and `DbInvariantError` for a repository invariant.
 - Every SDK client sets an explicit `logLevel` (`'warn'`) and a scrubbing logger. `debug` is never allowed in production.
 
 ## Money and time

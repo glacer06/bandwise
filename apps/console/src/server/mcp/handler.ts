@@ -12,7 +12,7 @@
 // run caps, spend caps and the RunResult envelope), the others through runOperation (scopes, roles,
 // approvals, audit). Nothing here holds a TypeSafe, OpenRouter or AI Gateway key.
 
-import type { OperationId, Scope } from "@bandwise/core";
+import { errorType, type OperationId, type Scope } from "@bandwise/core";
 import {
   formatCheckResult,
   formatOperationResult,
@@ -210,12 +210,12 @@ export async function handleMcpRequest(
     const body = isPost ? await req.readBody() : { text: null, tooLarge: false };
     const tools = isPost ? buildTools(toolsFor(auth.ctx.actor.scopes), auth, deps, req.signal) : [];
     const res = await handleMcpHttp({ method: req.method, protocolVersion: req.protocolVersion, body }, { ...SERVER_INFO, version: MCP_SERVER_VERSION }, tools, (e) =>
-      log?.(e instanceof Error ? e.name : "unknown error", requestId),
+      log?.(errorType(e), requestId),
     );
     return res;
   } catch (e) {
     // Never echo or log an unexpected error's message: it can quote the state or a secret.
-    log?.(e instanceof Error ? e.name : "unknown error", requestId);
+    log?.(errorType(e), requestId);
     return { status: 503, headers: { ...json }, body: { error: { code: "unavailable", message: "The request could not be completed.", requestId } } };
   }
 }
