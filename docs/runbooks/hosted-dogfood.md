@@ -9,6 +9,8 @@ Each step says who does it:
 
 No secret value goes into this file, a ticket, chat, a commit or a shell history. Secrets go from the team vault into Vercel, the Keychain, or a `read -s` prompt.
 
+**Status, 2026-10-05.** Sections 1 to 7 are done for Nick: the `internal` org is live, the hooks on this repo call the hosted run endpoint, and the live publish and rollback passed. Still open: PJ's console sign-in and audit check, PJ's tokens, revoking the tokens minted under the old pepper (section 8), and rotating the `bandwise_console` database password.
+
 ## 0. Before you start
 
 - [x] **PJ.** Security review and merge on `main`: D2a (PR #20), and D2b to D3 with this bootstrap script (PR #21, merged 2026-10-01 on Nick's go after PJ's three review passes).
@@ -74,9 +76,12 @@ Done 2026-10-01 (PJ, on Nick's handoff): `BANDWISE_TOKEN_PEPPER` (in the team va
 **Nick.** In this repo on `main`, in a fresh terminal. The script reads `DATABASE_URL` from the shell. Use the same `bandwise_console` pooler string as Vercel, so the bootstrap runs under RLS like the app.
 
 ```sh
-read -s "DATABASE_URL?DATABASE_URL (bandwise_console pooler): " && export DATABASE_URL
+read -s "PW?bandwise_console password: " && export DATABASE_URL="postgresql://bandwise_console.<project-ref>:${PW}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"; unset PW
+echo "$DATABASE_URL" | sed -E 's#(//[^:]+:).*@#\1***@#'
 pnpm -s --filter @bandwise/console bootstrap-internal --owner <nick's email> --member <pj's email>:admin
 ```
+
+The vault holds the password only, so the first line builds the URL around it. Use the shared pooler host on port 6543: the direct `db.<project-ref>.supabase.co` host is IPv6 only. The `sed` line shows the URL with the whole password masked, even when the password contains `@`.
 
 It creates, in one transaction, only what is missing:
 
@@ -113,7 +118,13 @@ order by created_at;
 
 Expect `org.create`, two `member.add`, `project.create`, `goal.create`, `app.create`, and one `set.create` and one `set.publish` per set.
 
+Done 2026-10-05 (Nick): the org, both members and the four sets were created. PJ's audit check is still open.
+
 **Console sign-in.** With `AUTH_SECRET` and `BETTER_AUTH_URL` also set in the shell, run `console-member` once for Nick and once for PJ with the org uuid above and the same roles. It reuses the user and membership the bootstrap made and writes a one-time reset link and a two-factor enrollment code to `~/.bandwise/console-reset-link.txt`. Hand both to the person over a private channel. They set a password, then set up two-factor with the code. A password alone cannot enroll an authenticator. See `docs/runbooks/console-access.md`.
+
+To hand PJ the file without showing it: `pbcopy < <file>`, paste into a vault note shared with PJ only, check the note shows both lines, then `rm <file> && pbcopy < /dev/null`. Copy nothing else in between, or the clipboard loses the link. The person signs in at `https://app.bandwise.dev/sign-in` after setting the password.
+
+Done 2026-10-05: Nick signed in with two-factor. PJ's link is in a shared vault note.
 
 ## 4. Mint the tokens
 
@@ -123,33 +134,40 @@ Expect `org.create`, two `member.add`, `project.create`, `goal.create`, `app.cre
 read -s "BANDWISE_TOKEN_PEPPER?Token pepper: " && export BANDWISE_TOKEN_PEPPER
 ```
 
-Each command prints the token once, on stdout, and its row id on stderr. Send the token to the clipboard, paste it into the Keychain prompt (it asks twice), then clear the clipboard. That way it never shows on screen and never sits in a process argument. `-U` replaces an older item with the same name.
+Each command prints the token once, on stdout, and its row id on stderr. The one-line form below captures the token in a shell variable, writes it straight into the Keychain and unsets the variable, so it never shows on screen, never touches the clipboard, and never goes through the Keychain password prompt. That prompt fails on a long pasted value ("passwords don't match"), and copying the row id after a clipboard mint overwrites the token, so do not use either. `-U` replaces an older item with the same name. The token is a process argument for a moment, which is fine on your own Mac.
 
 **Hook token** (an `sa_live_` agent token: `run` only, role ceiling `viewer`, the four dogfood sets, 90 days):
 
 ```sh
-pnpm -s --filter @bandwise/console mint-token agent \
-  --org <org uuid> --user <owner uuid> --name nick-hooks --role viewer \
-  --scopes run --sets <set_ids line> --days 90 | tr -d '\n' | pbcopy
-security add-generic-password -U -a "$USER" -s BANDWISE_TOKEN -w
-pbcopy < /dev/null
+T=$(pnpm -s --filter @bandwise/console mint-token agent --org <org uuid> --user <owner uuid> --name nick-hooks --role viewer --scopes run --sets <set_ids line> --days 90) && security add-generic-password -U -a "$USER" -s BANDWISE_TOKEN -w "$T"; unset T
+security find-generic-password -a "$USER" -s BANDWISE_TOKEN -w | cut -c1-8
 ```
+
+The check prints `sa_live_` and nothing else. A token is 84 characters: `echo ${#BANDWISE_TOKEN}` in a new terminal.
 
 **CLI token for Nick** (an `sa_live_` agent token, 90 days at most):
 
 ```sh
-pnpm -s --filter @bandwise/console mint-token agent \
-  --org <org uuid> --user <owner uuid> --name nick-cli --role editor \
-  --scopes run,sets:read,sets:write,release:production,runs:read,usage:read | tr -d '\n' | pbcopy
-security add-generic-password -U -a "$USER" -s BANDWISE_AGENT_TOKEN -w
-pbcopy < /dev/null
+T=$(pnpm -s --filter @bandwise/console mint-token agent --org <org uuid> --user <owner uuid> --name nick-cli --role editor --scopes run,sets:read,sets:write,release:production,runs:read,usage:read --days 90) && security add-generic-password -U -a "$USER" -s BANDWISE_AGENT_TOKEN -w "$T"; unset T
+security find-generic-password -a "$USER" -s BANDWISE_AGENT_TOKEN -w | cut -c1-8
 ```
 
-For PJ, run the agent command with PJ's member uuid and `--name pj-cli`, paste the token into a vault item only PJ can read instead of the Keychain, and let PJ load it into his own Keychain. Note the token row ids from stderr; section 8 needs them to revoke. Then clear this terminal's secrets and close it:
+For PJ, run the agent commands with PJ's member uuid and `--name pj-hooks` and `--name pj-cli`, but send each token to a vault item only PJ can read instead of the Keychain: `T=$(...) && printf %s "$T" | pbcopy; unset T`, paste into the vault item, then `pbcopy < /dev/null`. PJ loads them into PJ's own Keychain. Note the token row ids from stderr; section 8 needs them to revoke. Then clear this terminal's secrets and close it:
 
 ```sh
-unset DATABASE_URL BANDWISE_TOKEN_PEPPER
+unset DATABASE_URL BANDWISE_TOKEN_PEPPER AUTH_SECRET BETTER_AUTH_URL
 ```
+
+**A 401 in section 6 with a token that is 84 characters means the pepper differs.** The server hashes the token with Vercel's `BANDWISE_TOKEN_PEPPER` and finds no row. Neither copy can be read back, so do not compare: make a new pepper from one source and put the same bytes everywhere, then mint again.
+
+```sh
+P=$(openssl rand -hex 32); export BANDWISE_TOKEN_PEPPER="$P"; echo ${#P}
+printf %s "$P" | pbcopy
+```
+
+Paste it over the Vercel value (Production) and save, run the `printf` line again and paste it over the vault entry, then `pbcopy < /dev/null`, redeploy Production, load `DATABASE_URL` as in section 3, and mint both tokens again in this terminal. Then `unset DATABASE_URL BANDWISE_TOKEN_PEPPER P`. The pepper is used only for API, run and MCP tokens, so changing it signs nobody out of the console. Every token minted before stops working.
+
+Done 2026-10-05 (Nick): the first mint hit this 401, the pepper was replaced from one source as above, and `nick-hooks` and `nick-cli` were minted again. PJ's tokens are still open.
 
 **PJ.** Check the token rows match what was asked, and that no token value is stored anywhere:
 
@@ -168,6 +186,7 @@ order by created_at;
 
 ```sh
 export BANDWISE_TOKEN="$(security find-generic-password -a "$USER" -s BANDWISE_TOKEN -w 2>/dev/null)"
+export BANDWISE_MCP_TOKEN="$BANDWISE_TOKEN"
 # Management commands use the agent token for one command at a time; it never sits in the session env.
 bwa() { BANDWISE_TOKEN="$(security find-generic-password -a "$USER" -s BANDWISE_AGENT_TOKEN -w 2>/dev/null)" pnpm -s bandwise "$@"; }
 ```
@@ -200,6 +219,10 @@ bwa report --remote --since 1h
 
 `done-check` should show one run. Then start a new Claude Code session in this repo, send one prompt, and run `pnpm bandwise report --since 1h` (local receipts, now marked `provider: bandwise`) and `bwa report --remote --since 1h` (server runs). Both should show `model-tier`.
 
+The remote report books no savings for shadow runs (`savingsSuppressed`), while the local report prices its own estimate, so the two savings columns differ by design. `--since` is an exact timestamp on the server; the header prints dates only.
+
+Done 2026-10-05: `status: ok`, version 1, `shadow`, `jev-1.13.0`, and both reports showed all three hook sets. Two calls about 22:17 UTC returned a 503 with no outgoing request and recovered on their own; that is tracked separately.
+
 ## 7. One live publish and rollback
 
 **Nick.** This proves a change reaches the next hook call with no redeploy, and that rollback restores it. It uses a harmless change on the server draft only; the repo file stays as it is.
@@ -216,6 +239,8 @@ bwa spec diff .bandwise/sets/done-check.json
 ```
 
 The last command exits 0 when the server draft matches the file again. Publishing at `shadow` needs no approval. Moving a set to `controlled` does, and the approval is decided by a signed-in person, so that waits for the D3 console sign-in.
+
+Done 2026-10-05: version 2 reached the next call with no redeploy, rollback returned version 1, and `spec diff` matched the file.
 
 ## 8. Rollback plan
 
