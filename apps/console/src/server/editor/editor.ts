@@ -5,7 +5,7 @@
 // Results are plain data for the client. Operation errors carry messages written for people;
 // anything else becomes a generic message, so an unexpected error never reaches the browser.
 
-import { can, type ErrorDetail, type JsonValue, parseSetRef, roleAtLeast, type RunDryRunResult, type RunResult, type TenantContext } from "@bandwise/core";
+import { can, type ErrorDetail, errorType, type JsonValue, parseSetRef, roleAtLeast, type RunDryRunResult, type RunResult, type TenantContext } from "@bandwise/core";
 
 import { OperationError, OperationNotImplementedError } from "../operations/errors";
 import { type OperationDeps, runOperation } from "../operations/run-operation";
@@ -37,7 +37,7 @@ function failure(e: unknown, log?: (message: string) => void): { status: "error"
   if (e instanceof OperationError) return { status: "error", message: e.message };
   if (e instanceof OperationNotImplementedError) return { status: "error", message: "This is not built yet." };
   // The type only: a database or provider message can quote the spec or the state.
-  log?.(e instanceof Error ? e.name : "unknown error");
+  log?.(errorType(e));
   return { status: "error", message: GENERIC_FAILURE };
 }
 

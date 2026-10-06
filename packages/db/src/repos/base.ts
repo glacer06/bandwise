@@ -10,6 +10,7 @@ import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 
 import type { Page, PageReq } from "@bandwise/core/contracts";
 
+import { DbInvariantError } from "../errors.js";
 import { type AnyTx, drizzleOf, type TenantTx } from "../internal/drizzle.js";
 
 export interface RepoOptions {
@@ -61,7 +62,7 @@ export function appendOnlyRepo<T extends OrgTable>(table: T, opts: RepoOptions) 
     async insert(tx: TenantTx, values: TenantInsert<T>): Promise<Row> {
       const row = { ...withoutOrg(values), orgId: tx.orgId } as T["$inferInsert"];
       const [out] = (await drizzleOf(tx).insert(table).values(row).returning()) as Row[];
-      if (out === undefined) throw new Error(`insert into ${repo.table} returned no row`);
+      if (out === undefined) throw new DbInvariantError(`insert into ${repo.table} returned no row`);
       return out;
     },
     async insertMany(tx: TenantTx, values: TenantInsert<T>[]): Promise<Row[]> {
@@ -138,7 +139,7 @@ export function globalRepo<T extends IdTable>(table: T) {
     table: getTableName(table),
     async insert(tx: AnyTx, values: T["$inferInsert"]): Promise<Row> {
       const [out] = (await drizzleOf(tx).insert(table).values(values).returning()) as Row[];
-      if (out === undefined) throw new Error(`insert into ${getTableName(table)} returned no row`);
+      if (out === undefined) throw new DbInvariantError(`insert into ${getTableName(table)} returned no row`);
       return out;
     },
     async get(tx: AnyTx, id: string): Promise<Row | null> {

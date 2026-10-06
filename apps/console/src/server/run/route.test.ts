@@ -57,6 +57,6 @@ describe("POST /api/v1/sets/{ref}/run route", () => {
     expect(res.status).toBe(503);
     expect(JSON.stringify(await res.json())).not.toContain("PEPPER");
     expect(pulls.count).toBe(0);
-    expect(errors.mock.calls.map((c) => String(c[0]))).toEqual([expect.stringMatching(/: Error$/)]);
+    expect(errors.mock.calls.map((c) => String(c[0]))).toEqual([expect.stringMatching(/: TokenPepperError$/)]);
   });
 });

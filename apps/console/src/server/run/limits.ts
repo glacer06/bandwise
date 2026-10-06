@@ -90,6 +90,8 @@ const dayStart = (now: number) => new Date(Math.floor(now / DAY_MS) * DAY_MS);
 
 /** Thrown inside a limit transaction to undo the takes it already made. */
 class Refused extends Error {
+  override readonly name = "Refused";
+
   constructor(readonly level: "key" | "org") {
     super(`refused at ${level}`);
   }

@@ -58,6 +58,25 @@ describe("console env", () => {
     await expect(loadEnv()).rejects.toThrow();
   });
 
+  it("throws a named ServerEnvError that names the variables and never their values", async () => {
+    vi.stubEnv("AUTH_SECRET", "short-secret-value");
+    vi.stubEnv("DATABASE_URL", "not a url with password hunter2");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const e = await loadEnv().then(
+        () => null,
+        (err: unknown) => err as Error,
+      );
+      expect(e?.name).toBe("ServerEnvError");
+      expect(e?.message).toContain("AUTH_SECRET");
+      expect(e?.message).toContain("DATABASE_URL");
+      const printed = [e?.message, ...logged.mock.calls.flat().map(String)].join("\n");
+      expect(printed).not.toMatch(/short-secret-value|hunter2/);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it("accepts an OpenRouter key alone for the sdk transport", async () => {
     vi.stubEnv("SYSTEM_ONE_TRANSPORT", "sdk");
     vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test");

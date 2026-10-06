@@ -2,7 +2,7 @@
 // transport and a test platform key. Covers the gates (auth, the internal org, scope, allowlist,
 // channel, draft), the rollout stage, the body, dry runs and the persisted run row.
 
-import { repos, seedOrgs, type SeededOrg } from "@bandwise/db";
+import { DbConnectionError, repos, seedOrgs, type SeededOrg } from "@bandwise/db";
 import { createTestDatabase, type TestDatabase } from "@bandwise/db/testing";
 import { FixtureTransport, loadBundledFixtures } from "@bandwise/system-one-client/fixture";
 import { createTokenHasher, type TokenPrefix } from "@bandwise/tenancy";
@@ -166,6 +166,23 @@ describe("POST /api/v1/sets/{ref}/run", () => {
     expect(res.status).toBe(503);
     expect(JSON.stringify(res.body)).not.toContain("hunter2");
     expect(lines).toEqual(["Error"]);
+  });
+
+  it("names the database failure in the log line, never its message (2026-10-05)", async () => {
+    // Supavisor refused the app role's password while a rotation was half done. node-postgres
+    // throws that as a plain Error, so the line used to read only "Error".
+    const sasl = new Error('SASL: SCRAM-SERVER-FINAL-MESSAGE: server returned error: "password authentication failed for user \\"bandwise_console\\""');
+    const refused = new DbConnectionError("auth_failed", { cause: sasl });
+    const lines: string[] = [];
+    const raw = await token(internal);
+    const res = await handleRunHttp(
+      { authorization: `Bearer ${raw}`, rawRef: "inbox-triage", channel: null, readBody: async () => ({ text: "{}", tooLarge: false }), requestId: "r" },
+      () => ({ ...deps(), db: { ...t.db, withTenant: () => Promise.reject(refused) }, logError: (m) => lines.push(m) }),
+    );
+    expect(res.status).toBe(503);
+    expect(code(res)).toBe("system_one_unavailable");
+    expect(lines).toEqual(["DbConnectionError auth_failed < Error"]);
+    expect(JSON.stringify(res.body)).not.toContain("bandwise_console");
   });
 
   it("is open only to the internal org", async () => {

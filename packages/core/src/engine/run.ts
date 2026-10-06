@@ -185,6 +185,8 @@ export async function dryRunQuestionSet(
 // The run
 
 class RunFailure extends Error {
+  override readonly name = "RunFailure";
+
   constructor(
     readonly code: ErrorCode,
     readonly status: RunResult["status"] = "error",

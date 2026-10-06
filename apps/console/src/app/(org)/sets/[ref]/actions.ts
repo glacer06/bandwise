@@ -4,6 +4,7 @@
 // call server/editor, which goes through the operations. Inputs come from the browser, so each
 // one is checked for type before it is used.
 
+import { errorType } from "@bandwise/core";
 import { revalidatePath } from "next/cache";
 
 import { requireConsole } from "~/server/auth/console";
@@ -49,7 +50,7 @@ export async function previewDraftAction(ref: unknown, state: unknown, dryRun: u
   try {
     deps = serverRunDeps();
   } catch (e) {
-    log(e instanceof Error ? e.name : "unknown error");
+    log(errorType(e));
     return { status: "error", message: GENERIC_FAILURE };
   }
   const res = await previewDraft(ctx, org.slug, { ref, state, dryRun: dryRun === true }, deps, log);

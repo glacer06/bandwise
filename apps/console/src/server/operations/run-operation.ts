@@ -17,6 +17,7 @@ import {
   can,
   type DryRunResult,
   type ErrorDetail,
+  errorType,
   NO_SET_RISK_RESOURCE,
   type OperationContext,
   type OperationContextFor,
@@ -380,7 +381,7 @@ async function executeApproval(decider: TenantContext, approvalId: string, deps:
       if (row.ifMatch !== null) options.ifMatch = row.ifMatch;
       await runOperation(row.opId as never, agentCtx as never, row.input, options, deps);
     } catch (e) {
-      if (!(e instanceof OperationError)) deps.logError?.(e instanceof Error ? e.name : "unknown error", decider.requestId);
+      if (!(e instanceof OperationError)) deps.logError?.(errorType(e), decider.requestId);
       outcome = failure(e);
     }
   }

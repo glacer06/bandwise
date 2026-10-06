@@ -52,6 +52,19 @@ export const serverEnvShape = {
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 };
 
+/** The server env failed validation. Names the variables, never their values. */
+export class ServerEnvError extends Error {
+  override readonly name = "ServerEnvError";
+}
+
+type Issue = { readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined };
+
+/** The variable names behind validation issues, for the error and the log. Never a value. */
+export function invalidEnvNames(issues: readonly Issue[]): string[] {
+  const names = issues.map((i) => String((i.path ?? []).map((p) => (typeof p === "object" ? p.key : p))[0] ?? "(env)"));
+  return [...new Set(names)];
+}
+
 function loadEnv() {
   return createEnv({
     server: serverEnvShape,
@@ -70,6 +83,12 @@ function loadEnv() {
       }),
     emptyStringAsUndefined: true,
     skipValidation: process.env.SKIP_ENV_VALIDATION === "1",
+    // The default handler throws a plain Error, which a run log can only call "Error".
+    onValidationError: (issues) => {
+      const names = invalidEnvNames(issues).join(", ");
+      console.error(`Invalid environment variables: ${names}`);
+      throw new ServerEnvError(`Invalid environment variables: ${names}`);
+    },
   });
 }
 
@@ -77,7 +96,7 @@ export type ServerEnv = ReturnType<typeof loadEnv>;
 
 let cached: ServerEnv | undefined;
 
-/** The validated server env. Throws "Invalid environment variables" on first use if any is wrong. */
+/** The validated server env. Throws ServerEnvError on first use if any variable is wrong. */
 export function getEnv(): ServerEnv {
   cached ??= loadEnv();
   return cached;

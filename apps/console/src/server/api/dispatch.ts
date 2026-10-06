@@ -10,7 +10,7 @@
 // retry after the generic 503 below (for example a lost connection after the commit) replays the
 // committed response with `Idempotent-Replayed: true` instead of running again.
 
-import { API_PREFIX, errorEnvelope, OPERATION_CATALOG, type OperationId } from "@bandwise/core";
+import { API_PREFIX, errorEnvelope, errorType, OPERATION_CATALOG, type OperationId } from "@bandwise/core";
 import type { TokenHasher } from "@bandwise/tenancy";
 
 import { authenticateBearer } from "../auth/bearer";
@@ -203,7 +203,7 @@ export async function handleApiRequest(
     // Never echo or log an unexpected error's message: a database error can quote a spec or state.
     // The api.md code table has no generic server error, so this answers like the run route: a
     // retryable 503 with a fixed message.
-    log?.(e instanceof Error ? e.name : "unknown error", requestId);
+    log?.(errorType(e), requestId);
     return { status: 503, body: errorEnvelope("system_one_unavailable", { message: "The request could not be completed.", requestId }), headers: { ...json } };
   }
 }

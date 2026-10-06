@@ -38,3 +38,4 @@ export { roundHalfUp } from "./util/numbers.js";
 export { linearMatch } from "./util/regex.js";
 export { validateJsonSchema, type SchemaIssue } from "./util/json-schema.js";
 export { resolveStatePath, backtickPaths } from "./util/state-path.js";
+export { errorType } from "./util/error-type.js";

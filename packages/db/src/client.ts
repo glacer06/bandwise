@@ -7,7 +7,8 @@ import pg from "pg";
 
 import { TenantContext, UserId } from "@bandwise/core/contracts";
 
-import { DRIZZLE, type DrizzleDb, type NoTenantTx, type TenantTx, type UserTx } from "./internal/drizzle.js";
+import { connectionFailure, DbConnectionError, nameDriverError } from "./errors.js";
+import { DRIZZLE, type DrizzleDb, type DrizzleTx, type NoTenantTx, type TenantTx, type UserTx } from "./internal/drizzle.js";
 import { TENANT_SETTING, USER_SETTING } from "./rls.js";
 import * as schema from "./schema/index.js";
 
@@ -27,25 +28,43 @@ export interface BandwiseDb {
   close(): Promise<void>;
 }
 
+/**
+ * One transaction, with every failure named (errors.ts): a DbConnectionError when it never
+ * started (the pool could not connect, or BEGIN failed), else the error as thrown, with drizzle's
+ * query error named.
+ */
+async function transaction<T>(db: DrizzleDb, fn: (d: DrizzleTx) => Promise<T>): Promise<T> {
+  let started = false;
+  try {
+    return await db.transaction((d) => {
+      started = true;
+      return fn(d);
+    });
+  } catch (e) {
+    if (!started) throw new DbConnectionError(connectionFailure(e), { cause: e });
+    throw nameDriverError(e);
+  }
+}
+
 /** Wraps a drizzle database. Internal: callers use createDatabase or the test harness. */
 export function wrapDrizzle(db: DrizzleDb, close: () => Promise<void>): BandwiseDb {
   return {
     async withTenant(ctx, fn) {
       const parsed = TenantContext.parse(ctx);
-      return db.transaction(async (d) => {
+      return transaction(db, async (d) => {
         await d.execute(sql`select set_config(${TENANT_SETTING}, ${parsed.orgId}, true)`);
         return fn({ kind: "tenant", orgId: parsed.orgId, ctx: parsed, [DRIZZLE]: d });
       });
     },
     async withUser(userId, fn) {
       const id = UserId.parse(userId);
-      return db.transaction(async (d) => {
+      return transaction(db, async (d) => {
         await d.execute(sql`select set_config(${USER_SETTING}, ${id}, true)`);
         return fn({ kind: "user", userId: id, [DRIZZLE]: d });
       });
     },
     withNoTenant(fn) {
-      return db.transaction(async (d) => fn({ kind: "none", [DRIZZLE]: d }));
+      return transaction(db, async (d) => fn({ kind: "none", [DRIZZLE]: d }));
     },
     close,
   };

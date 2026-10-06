@@ -2,7 +2,7 @@
 // ~/server/run. This file hands over the raw request parts; the body is read only after the
 // caller passes auth and the gates, and every failure goes through the handler's error boundary.
 
-import { createTokenHasher } from "@bandwise/tenancy";
+import { tokenHasherFromEnv } from "@bandwise/tenancy";
 
 import { getEnv } from "~/env";
 import { readLimitedBody } from "~/server/early-access";
@@ -14,11 +14,10 @@ export const dynamic = "force-dynamic";
 
 const log = (message: string, requestId: string) => console.error(`run ${requestId}: ${message}`);
 
-/** Throws when the env is incomplete; handleRunHttp turns that into a generic 503. */
+/** Throws a named error when the env is incomplete; handleRunHttp turns that into a generic 503. */
 function runDeps(): RunHttpDeps {
-  const pepper = getEnv().BANDWISE_TOKEN_PEPPER;
-  if (pepper === undefined) throw new Error("BANDWISE_TOKEN_PEPPER is not set");
-  return { ...serverRunDeps(), hasher: createTokenHasher(pepper), logError: log };
+  const hasher = tokenHasherFromEnv({ BANDWISE_TOKEN_PEPPER: getEnv().BANDWISE_TOKEN_PEPPER });
+  return { ...serverRunDeps(), hasher, logError: log };
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ ref: string }> }): Promise<Response> {
