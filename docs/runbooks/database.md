@@ -67,10 +67,13 @@ The run route logs one line per unexpected failure, `run <requestId>: <type>`, w
 |---|---|
 | `auth_failed` | The password in Vercel's `DATABASE_URL` does not match the role. Check the Supavisor (pooler) logs in the Supabase dashboard, source `supavisor_logs`, not the Postgres logs. A rotation still in progress is the usual cause. |
 | `too_many_connections` | Supavisor's client limit or Postgres `max_connections`. The console pool holds 3 connections per instance. |
-| `timeout` or `network` | Supabase status, the pooler host and port in `DATABASE_URL`, and the Supavisor logs. |
+| `timeout` | No connection within 5 seconds: either the pooler did not answer, or all 3 of the instance's connections stayed busy that long. Check Supabase status and the Supavisor logs, then slow queries in the Postgres logs. |
+| `network` | The socket was refused, reset or closed, including a pooled connection that died before `BEGIN`. The pool drops that connection and opens a new one next time. Check Supabase status and the pooler host and port in `DATABASE_URL`. |
 | `unknown` | The Supavisor and Postgres logs at that minute. |
 
 A failed query inside a transaction reads like `DrizzleQueryError < DatabaseError 40P01`, with the SQLSTATE; that one is in the Postgres logs.
+
+A pooled connection that fails while idle logs `db pool: idle connection failed: <type>` and nothing else happens: the pool drops it and opens a new one on the next request. A few around a Supavisor restart are normal. A steady stream means the pooler is closing connections, so check the Supavisor logs.
 
 The response to the caller is still `503 system_one_unavailable` with a fixed message, because api.md has no code for a database failure yet. Trust the log line, not the code, for the cause.
 
