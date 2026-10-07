@@ -1,6 +1,6 @@
 # ADR-010: Rollout on release pointers and the effectiveness loop
 
-- **Status:** accepted (decided by Nick, 2026-09-26). Amendment 1 (policy action and would-act counts): proposed, 2026-10-07
+- **Status:** accepted (decided by Nick, 2026-09-26). Amendment 1 (policy action and would-act counts): accepted (Nick, 2026-10-07: "accept the amendment and apply 0009")
 - **Date:** 2026-09-26
 - **Owner:** Architect / Lead
 - **Contract impact:** `QuestionSetSpec` loses `rollout`; `release_pointers` gains `rollout_stage` and `active_experiment_id`; rollout stage `draft` is renamed `inactive`; `RunRequest`, `FeedbackReport`, `QualityTarget`, `SetHealth` and `ThresholdProposal`; decisions keyed by `DecisionId` with `kind: "question" | "composite"`; new tables `run_feedback`, `experiments`, `proposals`, `dataset_snapshots`, `question_daily`, `studio_sessions` and `studio_examples`. Amendment 1: `RunResult` gains `policyAction`; `runs` gains `policy_action`; the `usage.get` set rows gain `wouldActControlled` and `wouldActRoutes`, and its totals gain `wouldActControlled`; CLI receipts gain `policyAction`.
@@ -113,7 +113,7 @@ QualityTarget = { tier: "low" | "standard" | "high", highPrecision: number, medi
 - Shadow, eval, staging and experiment runs report `savingsUsd` 0 with a `savingsSuppressed` reason.
 - A quality-adjusted value (savings minus estimated error cost and review cost) is computed in rollups and set health, not per run.
 
-### Amendment 1: policy action and would-act counts (proposed, 2026-10-07, for NSI-735)
+### Amendment 1: policy action and would-act counts (accepted, Nick, 2026-10-07, for NSI-735)
 
 **Context.** Moving a set from `shadow` to `controlled` is a person reading what the set would have done. A run keeps only the effective action, and in `shadow` that is always `fallback`. So no report could say what the set would have done:
 
