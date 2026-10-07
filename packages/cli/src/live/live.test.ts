@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { main } from "../main.js";
 import { readReceipts } from "../receipts/index.js";
 import { fnv1a64 } from "../receipts/index.js";
-import { hookResponse, isTrustedCommand, lastExchange, mapHookInput, readLaunchProfile, readProviderKey, redactSecrets, runHook, setSlug, shapeState, taskStats } from "./index.js";
+import { hookResponse, isHarnessEnvelope, isTrustedCommand, lastExchange, mapHookInput, readLaunchProfile, readProviderKey, redactSecrets, runHook, setSlug, shapeState, taskStats } from "./index.js";
 import type { HookCommand } from "./hook.js";
 import { liveTransport } from "./transport.js";
 
@@ -244,6 +244,36 @@ describe("hook input mapping", () => {
     ].join("\n");
     expect(taskStats(`{"cut\n${t}`)).toEqual({ requestAt: Date.parse("2026-09-30T12:05:00.000Z"), turns: 3, toolCalls: 3 });
     expect(taskStats(line({ type: "assistant", message: { content: "no request in the tail" } }))).toBeNull();
+  });
+
+  it("skips harness envelopes: a wake-up is not a request", () => {
+    const line = (x: unknown): string => JSON.stringify(x);
+    const wake = "<task-notification>\n<task-type>queued-remote-notifications</task-type>\n<status>pending</status>\n</task-notification>";
+    // The shape of the 2026-10-07 receipts: a request, a wait on CI, then wake-ups while CI runs.
+    const t = [
+      line({ type: "user", timestamp: "2026-10-07T00:45:00.000Z", message: { content: "rename the flag, email the reviewer, then merge 32" } }),
+      line({ type: "assistant", message: { id: "m1", content: [{ type: "tool_use", name: "Bash" }] } }),
+      line({ type: "assistant", message: { id: "m2", content: [{ type: "text", text: "CI is rerunning. I'll merge as soon as it's green." }] } }),
+      line({ type: "user", timestamp: "2026-10-07T00:50:00.000Z", message: { content: wake } }),
+      line({ type: "assistant", message: { id: "m3", content: [{ type: "tool_use", name: "ReadNotifications" }] } }),
+      line({ type: "user", message: { content: [{ type: "tool_result", content: "1 notification" }] } }),
+      line({ type: "assistant", message: { id: "m4", content: [{ type: "text", text: "Vercel is still building the previews. Still waiting on CI to merge." }] } }),
+    ].join("\n");
+    expect(lastExchange(t)).toEqual({ request: "rename the flag, email the reviewer, then merge 32", lastReply: "Vercel is still building the previews. Still waiting on CI to merge." });
+    expect(taskStats(t)).toEqual({ requestAt: Date.parse("2026-10-07T00:45:00.000Z"), turns: 4, toolCalls: 2 });
+    // A session that has seen only wake-ups has no request, so the Stop is skipped with no call.
+    expect(mapHookInput("Stop", { transcript_path: "/t.jsonl" }, () => line({ type: "user", message: { content: wake } }) + "\n" + line({ type: "assistant", message: { content: "Nothing new." } }))).toEqual({ kind: "skip" });
+    expect(mapHookInput("UserPromptSubmit", { prompt: wake }, () => "")).toEqual({ kind: "skip" });
+  });
+
+  it("knows a harness envelope only by its opening tag", () => {
+    expect(isHarnessEnvelope("<task-notification>\n...")).toBe(true);
+    expect(isHarnessEnvelope('  <wake reason="external-event">')).toBe(true);
+    expect(isHarnessEnvelope("<webhook-payload>{}</webhook-payload>")).toBe(true);
+    expect(isHarnessEnvelope("<child-session-event kind=\"failed\">")).toBe(true);
+    expect(isHarnessEnvelope("<wakeful> is not a tag we write")).toBe(false);
+    expect(isHarnessEnvelope("Fix the <task-notification> parser")).toBe(false);
+    expect(isHarnessEnvelope("<system-reminder>")).toBe(false);
   });
 
   it("reads a launch profile only when it looks like a profile id", () => {

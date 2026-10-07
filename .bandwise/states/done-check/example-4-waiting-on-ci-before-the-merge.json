@@ -1,0 +1,4 @@
+{
+  "request": "Rename the --token flag to --made-by, email the reviewer about it, then merge the PR.",
+  "last_reply": "I renamed the flag and pushed the commit, and I emailed the reviewer with you cc'd. CI is rerunning on the PR because of the rename commit. I'll merge as soon as it's green and tell you."
+}

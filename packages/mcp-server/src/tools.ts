@@ -60,7 +60,7 @@ export const GATE_TOOLS: readonly GateToolSpec[] = [
     title: "Check the work is really done",
     description:
       "Use this when you are about to tell the user a coding task is finished. Send the user's request and the final reply you plan to give. " +
-      "Bandwise says where the work stands (finished, unverified, work left, overreach, waiting on the user, or unclear) with a confidence band. " +
+      "Bandwise says where the work stands (finished, unverified, work left, overreach, waiting on the user, waiting on an outside event such as CI, or unclear) with a confidence band. " +
       "Do not use it for questions or explanations that needed no change.",
     operation: "set.run",
     scope: "run",

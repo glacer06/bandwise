@@ -16,6 +16,7 @@ export const doneCheck = defineTemplate({
   ],
   notes: [
     "Routes: `stop` lets the agent stop, `continue` sends it back with the answer as the reason. `turn_outcome` says which: `work_left` (parts of the request are undone) or `unverified` (it claims success without a check it ran).",
+    "`waiting_on_event` means the agent did what it can for now and is waiting on something outside the session that arrives on its own, such as CI, a deploy, a review or a scheduled check-in. It has no route, so the agent stops and waits. Sending it back would only make it poll.",
     "`overreach` means the message reports work well outside the request, such as a new feature, a refactor, or files and docs nobody asked for. It has no route of its own, so it is logged and reported and never sends the agent back. A false alarm costs nothing, and the count shows how often the agent strays.",
     "Send the agent back only when `route` is `continue` and `overallAction` is `auto`. Any other result lets it stop, so a doubtful gate never keeps an agent looping.",
     "Start in `shadow`: the gate runs and logs what it would have done, and the agent always stops as it would without the hook. Move it to `controlled` after reading a week of results; there only a high band answer sends the agent back.",
@@ -56,11 +57,13 @@ export const doneCheck = defineTemplate({
               unverified:
                 "The message says the change is done or fixed, but the claim rests on expectation, such as \"this should work now\", with no test, build or command it ran to show it and no reason given for skipping one.",
               work_left:
-                "Parts of the request are still undone: the message lists next steps it has not taken, leaves TODOs, covers only some of the items asked for, or stops after a plan when the request asked for the change itself.",
+                "Parts of the request are still undone: the message lists next steps it has not taken, leaves TODOs, covers only some of the items asked for, or stops after a plan when the request asked for the change itself. A step that waits on CI, a deploy, a review or another outside event belongs under waiting_on_event.",
               overreach:
                 "The requested work is done, but the message also reports sizable work nobody asked for: a new feature, a refactor of code the request did not touch, new files, docs or tests beyond the change, or another review round. Small edits the change needed, such as renaming a helper it had to modify, do not count.",
               waiting_on_user:
                 "The message asks the user a question it needs answered to go on, or names something only the user can give, such as credentials, access, an approval or a product decision. Asking permission to do work the request already asked for belongs under work_left.",
+              waiting_on_event:
+                "The agent has done what it can for now and says it is waiting on something outside the session that will arrive by itself, such as CI or a build, a deploy, a code review, a scheduled check-in or a notification, before the next step. It asks nothing of the user.",
               unclear: "The message does not say enough to tell where the work stands.",
             },
             meta: { label: "Where the work stands" },

@@ -25,6 +25,7 @@ export {
   type HookRollout,
   type TaskStats,
   hookResponse,
+  isHarnessEnvelope,
   isTrustedCommand,
   lastExchange,
   mapHookInput,

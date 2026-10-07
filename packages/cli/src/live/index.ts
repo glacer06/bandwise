@@ -13,7 +13,7 @@ import { startProgram } from "./spawn.js";
 import { runLive } from "./run-live.js";
 import { type LiveFetch, liveTransport } from "./transport.js";
 
-export { DEFAULT_HOOK_TIMEOUT_MS, GATED_TOOLS, HOOK_EVENTS, HOOK_ROLLOUTS, type HookCommand, type HookEvent, type HookRollout, hookResponse, isTrustedCommand, lastExchange, mapHookInput, runHook, type TaskStats, taskStats } from "./hook.js";
+export { DEFAULT_HOOK_TIMEOUT_MS, GATED_TOOLS, HOOK_EVENTS, HOOK_ROLLOUTS, type HookCommand, type HookEvent, type HookRollout, hookResponse, isHarnessEnvelope, isTrustedCommand, lastExchange, mapHookInput, runHook, type TaskStats, taskStats } from "./hook.js";
 export { LAUNCH_PICKED_ENV, LAUNCH_PROFILE_ENV, PROVIDER_KEY_ENV, launchEnv, readLaunchProfile, readProviderKey } from "./key.js";
 export { DEFAULT_LAUNCH_TIMEOUT_MS, LAUNCH_QUESTION, LAUNCH_ROLLOUTS, type LaunchChoice, type LaunchCommand, type LaunchPick, type LaunchRollout, chooseProfile, launchArgs, runLaunchPrint, runLaunchStart, taskFromArgs } from "./launch.js";
 export { type SpawnFn, type StartResult, startProgram } from "./spawn.js";
