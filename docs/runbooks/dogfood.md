@@ -172,7 +172,7 @@ Once the `internal` org is up on app.bandwise.dev (D2e) with the `.bandwise/sets
    `spec diff` exits 0 when the server draft matches the file, 2 when it differs, and 1 with one line that names the problem (for example `error unauthenticated (HTTP 401)` with "check BANDWISE_TOKEN").
 4. Open a new terminal, start a new Claude Code session, send one prompt, then run `pnpm bandwise report --since 1h` for the local receipts and `bwa report --remote --since 1h` for the server's runs. Both should show `model-tier`.
 
-Two run-only tokens now make hosted runs: `nick-hooks` from this Mac and `sims-hooks` from cloud sessions on another repo. To tell them apart, run `bwa report --remote --since 1d --token nick-hooks` (or `--token sims-hooks`), or pick a token under "Made by" on `/runs` and `/savings` in the console. Each run row and each run page shows the token that made it.
+Two run-only tokens now make hosted runs: `nick-hooks` from this Mac and `sims-hooks` from cloud sessions on another repo. To tell them apart, run `bwa report --remote --since 1d --made-by nick-hooks` (or `--made-by sims-hooks`), or pick a token under "Made by" on `/runs` and `/savings` in the console. Each run row and each run page shows the token that made it.
 
 What changes in hosted mode:
 - The hook sends `POST /api/v1/sets/<slug>/run` with the token. The slug is the spec file name (`done-check`, `action-risk-gate`, `model-tier`), or `--remote-set <slug>` on the hook command. It does not need `TYPESAFE_API_KEY`: the server runs the model with the platform key.
