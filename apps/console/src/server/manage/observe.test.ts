@@ -88,7 +88,9 @@ const MONTH_START = (() => {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
 })();
 
-async function insertRun(org: SeededOrg, createdAt: Date, cost: number, actorTokenId: string | null = null) {
+type RunInsert = Parameters<typeof repos.runs.insert>[1];
+
+async function insertRun(org: SeededOrg, createdAt: Date, cost: number, actorTokenId: string | null = null, over: Partial<RunInsert> = {}) {
   const id = crypto.randomUUID();
   await t.db.withTenant(sys(org.orgId), (tx) =>
     repos.runs.insert(tx, {
@@ -124,6 +126,7 @@ async function insertRun(org: SeededOrg, createdAt: Date, cost: number, actorTok
       latencyMs: 5,
       status: "ok",
       createdAt,
+      ...over,
     }),
   );
   return id;
@@ -182,6 +185,30 @@ describe("usage.get per day", () => {
       { day: day(1), runs: 1, errors: 0, systemOneCostMicroUsd: 10, counterfactualMicroUsd: 100, savingsMicroUsd: 90, llmCallsAvoided: 1 },
     ]);
     expect(usage.totals.systemOneCostMicroUsd).toBe(20);
+  });
+});
+
+describe("usage.get would-act counts (ADR-010 Amendment 1)", () => {
+  it("counts high band runs whose policy action is auto, split by route; older rows without one are left out", async () => {
+    // A window of its own, after the per-day runs above and the by-token runs below.
+    const at = (h: number) => new Date(MONTH_START + 10 * 86_400_000 + h * 3_600_000);
+    const shadow = { rollout: "shadow" as const, overallAction: "fallback" as const };
+    await insertRun(internal, at(1), 1, null, { ...shadow, runBand: "high", policyAction: "auto", route: "continue" });
+    await insertRun(internal, at(2), 1, null, { ...shadow, runBand: "high", policyAction: "auto", route: "continue" });
+    await insertRun(internal, at(3), 1, null, { ...shadow, runBand: "high", policyAction: "auto", route: "stop" });
+    await insertRun(internal, at(4), 1, null, { ...shadow, runBand: "high", policyAction: "review", route: "continue" });
+    await insertRun(internal, at(5), 1, null, { ...shadow, runBand: "medium", policyAction: "auto", route: "continue" });
+    await insertRun(internal, at(6), 1, null, { ...shadow, runBand: "high", policyAction: null, route: "continue" });
+    await insertRun(acme, at(1), 1, null, { ...shadow, runBand: "high", policyAction: "auto", route: "continue" });
+    const range = { from: at(0).toISOString(), to: at(7).toISOString() };
+    const usage = await ok<UsageView>(op("usage.get", owner(), range));
+    expect(usage.sets).toHaveLength(1);
+    expect(usage.sets[0]).toMatchObject({ runs: 6, bandHigh: 5, bandMedium: 1, wouldActControlled: 3 });
+    expect(usage.sets[0]?.wouldActRoutes).toEqual([
+      { route: "continue", runs: 2 },
+      { route: "stop", runs: 1 },
+    ]);
+    expect(usage.totals.wouldActControlled).toBe(3);
   });
 });
 

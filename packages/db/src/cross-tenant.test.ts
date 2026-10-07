@@ -64,6 +64,7 @@ function runValues(f: Fixture) {
     stages: [],
     runBand: "high" as const,
     overallAction: "auto" as const,
+    policyAction: "auto" as const,
     inputTokens: 0,
     outputTokens: 0,
     systemOneCalls: 0,
@@ -628,6 +629,14 @@ const PROBES: Record<string, Probe> = {
     expect((await inB((tx) => r.runs.totalsBySet(tx, { ...range, setIds: [B.setId] })))[0]?.runs).toBeGreaterThan(0);
     expect(await inA((tx) => r.runs.totalsBySet(tx, { ...range, setIds: [B.setId] }))).toEqual([]);
     expect((await inA((tx) => r.runs.totalsBySet(tx, range))).map((x) => x.setId)).not.toContain(B.setId);
+  },
+  "runs.wouldActByRoute": async (r) => {
+    const range = { from: new Date(0), to: new Date(Date.now() + 86_400_000) };
+    const sum = (rows: { runs: number }[]) => rows.reduce((n, x) => n + x.runs, 0);
+    // The fixture run is high band with policy action auto, so org B sees it as would-act.
+    expect(sum(await inB((tx) => r.runs.wouldActByRoute(tx, { ...range, setIds: [B.setId] })))).toBeGreaterThan(0);
+    expect(await inA((tx) => r.runs.wouldActByRoute(tx, { ...range, setIds: [B.setId] }))).toEqual([]);
+    expect((await inA((tx) => r.runs.wouldActByRoute(tx, range))).map((x) => x.setId)).not.toContain(B.setId);
   },
   "runs.totalsByDay": async (r) => {
     const range = { from: new Date(0), to: new Date(Date.now() + 86_400_000) };

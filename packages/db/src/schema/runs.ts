@@ -70,6 +70,8 @@ export const runs = pgTable(
     decisions: json<Record<string, Decision>>(),
     runBand: textEnum(E.band).notNull(),
     overallAction: textEnum(E.action).notNull(),
+    /** RunResult.policyAction (ADR-010 Amendment 1). Null on rows written before it. */
+    policyAction: textEnum(E.action),
     route: text(),
     warnings: json<string[]>()
       .notNull()

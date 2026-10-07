@@ -19,6 +19,7 @@ export {
   type RunPageFilter,
   type RunTotalsRange,
   type RunSetTotals,
+  type RunWouldActRoute,
 } from "./repos/index.js";
 export {
   AUTH_MODELS,

@@ -70,6 +70,7 @@ function rowFromResult(r: RunResult): unknown {
     decisions: r.decisions,
     runBand: r.runBand,
     overallAction: r.overallAction,
+    policyAction: r.policyAction,
     route: r.route,
     warnings: r.warnings,
     inputTokens: r.cost.systemOneInputTokens,

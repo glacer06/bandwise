@@ -7,6 +7,7 @@ const totals = (runs: number, high: number, medium: number, low: number, errors:
   bandHigh: high,
   bandMedium: medium,
   bandLow: low,
+  wouldActControlled: high,
   errors,
   inputTokens: runs * 400,
   outputTokens: runs * 3,
@@ -22,8 +23,8 @@ export const USAGE_REPLY = {
   to: "2026-10-01T00:00:00.000Z",
   token: null,
   sets: [
-    { setId: "6b0f8c1e-2a4d-4f6e-9a1b-3c5d7e9f1a2b", slug: "model-tier", ...totals(1, 0, 1, 0, 0, 50, 0) },
-    { setId: "0d4e2f6a-8b1c-4d3e-a5f7-9b1c3d5e7f9a", slug: "done-check", ...totals(2, 1, 0, 1, 1, 120, 2_000) },
+    { setId: "6b0f8c1e-2a4d-4f6e-9a1b-3c5d7e9f1a2b", slug: "model-tier", ...totals(1, 0, 1, 0, 0, 50, 0), wouldActRoutes: [] },
+    { setId: "0d4e2f6a-8b1c-4d3e-a5f7-9b1c3d5e7f9a", slug: "done-check", ...totals(2, 1, 0, 1, 1, 120, 2_000), wouldActRoutes: [{ route: "continue", runs: 1 }] },
   ],
   totals: totals(3, 1, 1, 1, 1, 170, 2_000),
   days: [{ day: "2026-09-30", runs: 3, errors: 1, systemOneCostMicroUsd: 170, counterfactualMicroUsd: 2_170, savingsMicroUsd: 2_000, llmCallsAvoided: 1 }],

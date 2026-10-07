@@ -49,6 +49,8 @@ RunResult = {
   runBand: Band,
   overallAction: Action,                           // the most conservative effectiveAction among relevant decisions,
                                                    // order review > fallback > escalate_to_llm > auto (confidence-policy.md)
+  policyAction: Action | null,                     // the same summary over policy actions, before the stage (ADR-010
+                                                   // Amendment 1); null only on runs stored before it
   route: string | null,
   cost: RunCost,
   reviewItemIds?: string[],                        // review items of kind "action" this run created

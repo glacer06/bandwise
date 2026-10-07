@@ -93,6 +93,8 @@ Only the band feeds `runBand`. A confidently non-urgent email has a low level an
 
 Most to least conservative: `review > fallback > escalate_to_llm > auto`. `overallAction` is the most conservative `effectiveAction` among relevant decisions with `gating: true` (composites included). With no relevant gating decision, it is the most conservative among all relevant decisions. With no relevant decision, it is `fallback`.
 
+`policyAction` is the same summary over the same decisions, taken from each decision's policy `action` instead of its `effectiveAction` (ADR-010 Amendment 1). It says what the policy would do whatever the stage. Callers never act on it. **A run would act in controlled** when `runBand` is `high` and `policyAction` is `auto`; `usage.get`, `/savings` and both CLI reports count those runs, split by route, so a set in `shadow` shows what a move would do.
+
 A review item of kind `action` is created exactly when a decision's `effectiveAction` is `review`. The configured fallback runs only when the policy action itself is `fallback` and the rollout stage lets policy actions through. When the rollout stage forces `fallback`, it means "keep your existing path" and nothing runs.
 
 ### Escalation

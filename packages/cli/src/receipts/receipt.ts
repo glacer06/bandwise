@@ -57,6 +57,11 @@ export interface Receipt {
   route: string | null;
   runBand: Band | null;
   overallAction: string | null;
+  /**
+   * The policy's overall action before the rollout stage (ADR-010 Amendment 1). Null when no run
+   * came back. Receipts from older CLIs, and from servers that do not send it, have none.
+   */
+  policyAction?: string | null;
   decisions: Record<string, ReceiptDecision>;
   /** Whether the hook changed anything in the session. Always false in shadow. */
   acted: boolean;

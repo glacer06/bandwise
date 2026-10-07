@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReviewItemView, RunDetail } from "~/server/operations/views";
 
-import { pairDays, uncounted } from "../savings/savings-view";
+import { pairDays, routeSplitLabel, uncounted } from "../savings/savings-view";
 import { queueEntry, STATE_LIMIT } from "./queue-data";
 
 const item = {
@@ -73,5 +73,6 @@ describe("savings numbers", () => {
     const totals = { systemOneCostMicroUsd: 10, counterfactualMicroUsd: 500, savingsMicroUsd: 300 } as never;
     expect(uncounted(totals)).toBe(190);
     expect(uncounted({ systemOneCostMicroUsd: 10, counterfactualMicroUsd: 500, savingsMicroUsd: 490 } as never)).toBe(0);
+    expect(routeSplitLabel([{ route: "continue", runs: 13 }, { route: null, runs: 2 }])).toBe("continue 13 · no route 2");
   });
 });

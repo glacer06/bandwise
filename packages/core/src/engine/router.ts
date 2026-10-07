@@ -75,6 +75,8 @@ export interface RouterOutput {
   composites: Record<string, number | null>;
   runBand: Band;
   overallAction: Action;
+  /** The most conservative policy action of the same decisions, before the rollout stage (ADR-010 Amendment 1). */
+  policyAction: Action;
   route: string | null;
   /** unknown_answer_type and the other answer warnings, once each, in first-seen order. */
   warnings: string[];
@@ -102,14 +104,15 @@ function emptyDecision(kind: "question" | "composite"): Decision {
 export function summarizeDecisions(
   decisions: Readonly<Record<string, Decision>>,
   meta: Readonly<Record<string, DecisionMeta>>,
-): { runBand: Band; overallAction: Action } {
+): { runBand: Band; overallAction: Action; policyAction: Action } {
   const counted = Object.entries(decisions).filter(([id, d]) => d.relevant && meta[id]?.counts === true);
   const gating = counted.filter(([id]) => meta[id]?.gating === true);
   const pool = gating.length > 0 ? gating : counted;
-  if (pool.length === 0) return { runBand: "low", overallAction: "fallback" };
+  if (pool.length === 0) return { runBand: "low", overallAction: "fallback", policyAction: "fallback" };
   return {
     runBand: minBand(pool.map(([, d]) => d.band)),
     overallAction: mostConservativeAction(pool.map(([, d]) => d.effectiveAction)),
+    policyAction: mostConservativeAction(pool.map(([, d]) => d.action)),
   };
 }
 
@@ -192,8 +195,8 @@ export function routeAnswers(input: RouterInput): RouterOutput {
   const match = (spec.routes ?? []).find((r) => evaluateCondition(r.when, routeCtx));
   const route = match?.output ?? spec.defaultRoute ?? null;
 
-  const { runBand, overallAction } = summarizeDecisions(decisions, meta);
-  return { decisions, meta, views, composites: compositeValues, runBand, overallAction, route, warnings };
+  const { runBand, overallAction, policyAction } = summarizeDecisions(decisions, meta);
+  return { decisions, meta, views, composites: compositeValues, runBand, overallAction, policyAction, route, warnings };
 }
 
 export interface OutageRouterInput {
@@ -256,8 +259,8 @@ export function routeOutage(input: OutageRouterInput): RouterOutput {
     meta[c.id] = { kind: "composite", gating, counts: c.policy !== undefined, actionRef: null, questionType: null, answer: null };
   }
 
-  const { runBand, overallAction } = summarizeDecisions(decisions, meta);
-  return { decisions, meta, views: {}, composites: {}, runBand, overallAction, route: null, warnings: [] };
+  const { runBand, overallAction, policyAction } = summarizeDecisions(decisions, meta);
+  return { decisions, meta, views: {}, composites: {}, runBand, overallAction, policyAction, route: null, warnings: [] };
 }
 
 function routeComposite(

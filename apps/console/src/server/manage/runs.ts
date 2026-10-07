@@ -153,6 +153,7 @@ const ZERO: Omit<RunSetTotals, "setId"> = {
   bandHigh: 0,
   bandMedium: 0,
   bandLow: 0,
+  wouldActControlled: 0,
   errors: 0,
   inputTokens: 0,
   outputTokens: 0,
@@ -180,11 +181,16 @@ export async function getUsage(
   const range: RunTotalsRange = { from, to, ...(setIds === undefined ? {} : { setIds }), ...(token === null ? {} : { actorTokenIds: token.ids }) };
   const rows = await repos.runs.totalsBySet(env.tx, range);
   const days = await repos.runs.totalsByDay(env.tx, range);
+  const routes = await repos.runs.wouldActByRoute(env.tx, range);
   const totals = { ...ZERO };
   const sets: UsageView["sets"] = [];
   for (const row of rows) {
     const set = await repos.questionSets.get(env.tx, row.setId);
-    sets.push({ ...row, slug: set?.slug ?? row.setId });
+    const wouldActRoutes = routes
+      .filter((r) => r.setId === row.setId)
+      .map(({ route, runs }) => ({ route, runs }))
+      .sort((a, b) => b.runs - a.runs || String(a.route).localeCompare(String(b.route)));
+    sets.push({ ...row, slug: set?.slug ?? row.setId, wouldActRoutes });
     for (const k of Object.keys(ZERO) as (keyof typeof ZERO)[]) totals[k] += row[k];
   }
   return { from: iso(from), to: iso(to), token: token?.name ?? null, sets, totals, days };

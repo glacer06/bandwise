@@ -288,7 +288,20 @@ describe("conservative ordering: review > fallback > escalate_to_llm > auto", ()
     const out2 = routeAnswers(input(noGating, { a: noul("high"), b: noul("medium") }));
     expect(out2.runBand).toBe("medium");
     expect(out2.overallAction).toBe("review");
-    expect(summarizeDecisions({}, {})).toEqual({ runBand: "low", overallAction: "fallback" });
+    expect(summarizeDecisions({}, {})).toEqual({ runBand: "low", overallAction: "fallback", policyAction: "fallback" });
+  });
+
+  it("policyAction is the policy's answer before the stage, over the same decisions (ADR-010 Amendment 1)", () => {
+    const s = spec({ g: noulPolicy(true, { kind: "auto" }), n: noulPolicy(false, { kind: "review" }) });
+    const answers = { g: noul("high"), n: noul("high") };
+    // Shadow: nothing acts, but the policy would.
+    const shadow = routeAnswers(input(s, answers, { rollout: "shadow" }));
+    expect(shadow).toMatchObject({ runBand: "high", overallAction: "fallback", policyAction: "auto" });
+    // The non-gating review decision is outside the pool, as it is for overallAction.
+    expect(routeAnswers(input(s, answers)).policyAction).toBe("auto");
+    // Controlled, medium band: the stage turns auto into review; the policy still says auto.
+    const medium = routeAnswers(input(s, { g: noul("medium"), n: noul("high") }, { rollout: "controlled" }));
+    expect(medium).toMatchObject({ runBand: "medium", overallAction: "review", policyAction: "auto" });
   });
 });
 

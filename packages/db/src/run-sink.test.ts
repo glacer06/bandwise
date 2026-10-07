@@ -112,6 +112,7 @@ describe("RunSink.persist", () => {
       stateHash: "sha256:state",
       runBand: "medium",
       overallAction: "review",
+      policyAction: "review",
       route: "urgent",
       inputTokens: 318,
       outputTokens: 0,

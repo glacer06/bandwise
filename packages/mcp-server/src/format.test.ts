@@ -42,6 +42,7 @@ function run(over: Record<string, unknown> = {}): RunResult {
     decisions: { turn_outcome: decision("work_left", "high") } satisfies Decisions,
     runBand: "high",
     overallAction: "auto",
+    policyAction: "auto",
     route: "continue",
     cost: {
       systemOneInputTokens: 100,

@@ -1,9 +1,9 @@
 # ADR-010: Rollout on release pointers and the effectiveness loop
 
-- **Status:** accepted (decided by Nick, 2026-09-26)
+- **Status:** accepted (decided by Nick, 2026-09-26). Amendment 1 (policy action and would-act counts): proposed, 2026-10-07
 - **Date:** 2026-09-26
 - **Owner:** Architect / Lead
-- **Contract impact:** `QuestionSetSpec` loses `rollout`; `release_pointers` gains `rollout_stage` and `active_experiment_id`; rollout stage `draft` is renamed `inactive`; `RunRequest`, `FeedbackReport`, `QualityTarget`, `SetHealth` and `ThresholdProposal`; decisions keyed by `DecisionId` with `kind: "question" | "composite"`; new tables `run_feedback`, `experiments`, `proposals`, `dataset_snapshots`, `question_daily`, `studio_sessions` and `studio_examples`.
+- **Contract impact:** `QuestionSetSpec` loses `rollout`; `release_pointers` gains `rollout_stage` and `active_experiment_id`; rollout stage `draft` is renamed `inactive`; `RunRequest`, `FeedbackReport`, `QualityTarget`, `SetHealth` and `ThresholdProposal`; decisions keyed by `DecisionId` with `kind: "question" | "composite"`; new tables `run_feedback`, `experiments`, `proposals`, `dataset_snapshots`, `question_daily`, `studio_sessions` and `studio_examples`. Amendment 1: `RunResult` gains `policyAction`; `runs` gains `policy_action`; the `usage.get` set rows gain `wouldActControlled` and `wouldActRoutes`, and its totals gain `wouldActControlled`; CLI receipts gain `policyAction`.
 
 ## Context
 
@@ -112,6 +112,31 @@ QualityTarget = { tier: "low" | "standard" | "high", highPrecision: number, medi
 - Decision savings count only questions whose `effectiveAction` is `auto`. Every other decision counts cost, not savings. The escalation-avoided formula is unchanged.
 - Shadow, eval, staging and experiment runs report `savingsUsd` 0 with a `savingsSuppressed` reason.
 - A quality-adjusted value (savings minus estimated error cost and review cost) is computed in rollups and set health, not per run.
+
+### Amendment 1: policy action and would-act counts (proposed, 2026-10-07, for NSI-735)
+
+**Context.** Moving a set from `shadow` to `controlled` is a person reading what the set would have done. A run keeps only the effective action, and in `shadow` that is always `fallback`. So no report could say what the set would have done:
+
+- The CLI report's "would have acted" read the receipt's `overallAction`. In shadow it counted 0 on every run, the exact number the dogfood runbook tells Nick to read. The 2026-10-07 read-out had to be done by hand in SQL.
+- The server cannot rebuild it from the stored decisions. `overallAction` comes from the relevant gating decisions, and a stored decision does not say whether it gates. A guess over all relevant decisions is wrong for any set with a non-gating question, such as `risk_kind` in `action-risk-gate`.
+
+**Decision.**
+
+1. `RunResult` gains `policyAction`: the most conservative policy `action` over the same decisions that set `overallAction` (the relevant gating decisions, or every relevant counted decision when none gate), before the rollout stage applies. In `full` it equals `overallAction`. It is null only on runs recorded before this amendment and read back from storage. Section 2's table is unchanged: callers still act on `overallAction` only.
+2. **A run would act in controlled** when its `runBand` is `high` and its `policyAction` is `auto`. That is the run the same channel would act on after a move to `controlled`. It counts runs, not decisions. One definition serves the CLI report and `usage.get`.
+3. The count includes runs whose route changes nothing for the host, such as `stop`. So `usage.get` also returns, per set, the would-act runs by route (`wouldActRoutes`), and the CLI report prints the same split. The reader decides which routes matter.
+4. `runs.policy_action` stores it. Older rows stay null and are not counted. They are not backfilled, because the pool cannot be rebuilt from stored decisions (see Context).
+5. Receipts carry `policyAction`. The report counts would-act runs from receipts that have it. On older receipts it keeps the old rule, so their count stays what it was.
+
+**Options considered.**
+
+| Option | Pros | Cons |
+|---|---|---|
+| Compute it at query time from stored decisions | No contract or column change | Wrong whenever a set has a non-gating question; the stored decision does not carry `gating` |
+| Replay the router over stored answers and the version's spec | Exact, even for old runs | Loads a spec and replays every run on each report; answers can be removed by retention |
+| Add `policyAction` to the envelope and the run row (chosen) | Exact, one field, cheap to count, the same rule everywhere | A contract change and a migration; old rows stay uncounted |
+
+**Consequences.** The `/savings` page, `bandwise report --remote` and the local report show band mix and would-act counts for every set and every stage. Fixtures and literal `RunResult` values in tests gain the field. The router keeps full branch coverage. Reversal: stop reading the field. The column is nullable, and dropping it loses no other data.
 
 ## Options considered
 

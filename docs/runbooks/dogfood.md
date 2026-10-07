@@ -99,7 +99,7 @@ pnpm bandwise report --since 7d
 pnpm bandwise report --since 7d --set action-risk-gate --json
 ```
 
-Per set it shows runs and failures, decisions, the band mix, how often the set would have acted, how often it did act (0 in shadow), System One spend, counterfactual LLM spend, estimated savings and latency.
+Per set it shows runs and failures, decisions, the band mix, how many runs would act in controlled and on which route, how often it did act (0 in shadow), System One spend, counterfactual LLM spend, estimated savings and latency.
 
 Read the savings as estimates. The counterfactual prices one comparator LLM call per decision. In Claude Code the real saving is fewer wasted turns and fewer risky actions, and no receipt can price those exactly. What the receipts can tell you for sure is what System One cost and how often each set would have stepped in.
 
@@ -123,13 +123,13 @@ How to read it:
 
 One set at a time, after about a week of receipts, and only when you say so.
 
-1. Run `pnpm bandwise report --since 7d --set <set>`. Look at "would have acted" and the band mix. A set that would have acted on ordinary work stays in shadow: tighten its thresholds in `.bandwise/sets/<set>.json` first, commit, and give it another week.
+1. Run `pnpm bandwise report --since 7d --set <set>`. Look at "would act in controlled", its route split and the band mix. A run counts when its band is high and its policy says auto; a route such as `stop` changes nothing in the session, so read the acting route (`continue`, `ask` or `mechanical`). Receipts written before 2026-10-07 carry no policy action and count 0 in shadow. A set that would have acted on ordinary work stays in shadow: tighten its thresholds in `.bandwise/sets/<set>.json` first, commit, and give it another week.
 2. In `.claude/settings.json`, change that set's hook command from `--rollout shadow` to `--rollout controlled`. Commit it with a message that names the set and the receipts you read.
 3. In `controlled`, only a high band answer acts. The next report shows it under "acted".
 
 To step back, change it to `--rollout shadow` again. That is never gated.
 
-**In hosted mode (`BANDWISE_TOKEN` set), the server's stage decides, and the `--rollout` flag in `.claude/settings.json` is ignored.** Read the hosted runs, not only your local receipts: `pnpm bandwise report --remote --since 7d --set <set>`, or `/runs` in the console filtered by set and band. Then move the production channel, either from the set's Releases panel in the console, or with the CLI token:
+**In hosted mode (`BANDWISE_TOKEN` set), the server's stage decides, and the `--rollout` flag in `.claude/settings.json` is ignored.** Read the hosted runs, not only your local receipts: `pnpm bandwise report --remote --since 7d --set <set>`, or the per-set table on `/savings` in the console, both with "would act in controlled" and its route split, and `/runs` filtered by set and band to read the runs themselves. Hosted runs from cloud sessions are only on the server; their receipts stay in the cloud container. Then move the production channel, either from the set's Releases panel in the console, or with the CLI token:
 
 ```sh
 bwa rollout <set> controlled --reason "NSI-735: <what you read>"

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../main.js";
-import { type Receipt, type ReceiptSession, appendReceipt, buildCompare, buildReport, defaultReceiptsPath, formatCompare, parseSince, readReceipts, specHash } from "./index.js";
+import { type Receipt, type ReceiptSession, appendReceipt, buildCompare, buildReport, defaultReceiptsPath, formatCompare, formatReport, parseSince, readReceipts, specHash } from "./index.js";
 
 const NOW = Date.parse("2026-09-28T12:00:00Z");
 
@@ -63,6 +63,22 @@ describe("report", () => {
     expect(parseSince("24h")).toBe(86_400_000);
     expect(parseSince("30m")).toBe(1_800_000);
     expect(parseSince("week")).toBeNull();
+  });
+
+  it("counts would-act in shadow from the policy action, split by route (ADR-010 Amendment 1)", () => {
+    // The default receipt is a shadow run: overallAction fallback whatever the policy says.
+    const rs = [
+      receipt({ runBand: "high", overallAction: "fallback", policyAction: "auto", route: "continue" }),
+      receipt({ runBand: "high", overallAction: "fallback", policyAction: "auto", route: "continue" }),
+      receipt({ runBand: "high", overallAction: "fallback", policyAction: "auto", route: "stop" }),
+      receipt({ runBand: "high", overallAction: "fallback", policyAction: "review", route: "continue" }),
+      receipt({ runBand: "medium", overallAction: "fallback", policyAction: "auto", route: "continue" }),
+      // An older receipt has no policy action and keeps the old rule, which in shadow counts nothing.
+      receipt({ runBand: "high", overallAction: "fallback", route: "continue" }),
+    ];
+    const r = buildReport(rs, { now: NOW, sinceMs: parseSince("7d"), sinceText: "7d" });
+    expect(r.sets[0]).toMatchObject({ wouldAct: 3, wouldActRoutes: [{ route: "continue", runs: 2 }, { route: "stop", runs: 1 }] });
+    expect(formatReport(r, "r.jsonl", 0)).toContain("would act in controlled 3 (continue 2, stop 1), acted 0");
   });
 
   it("sums per set: decisions, bands, would-act, spend and estimated savings", () => {

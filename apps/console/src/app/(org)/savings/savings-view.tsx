@@ -31,6 +31,11 @@ export function uncounted(t: UsageView["totals"]): number {
   return Math.max(0, t.counterfactualMicroUsd - t.systemOneCostMicroUsd - t.savingsMicroUsd);
 }
 
+/** "continue 13 · stop 13": the would-act runs by route, as the per-set table shows them. */
+export function routeSplitLabel(routes: readonly { route: string | null; runs: number }[]): string {
+  return routes.map((r) => `${r.route ?? "no route"} ${formatCount(r.runs)}`).join(" · ");
+}
+
 export function SavingsView({ usage, sets, rangeLabel, rangeParam }: { usage: UsageView; sets: SetDirectory; rangeLabel: string; rangeParam: string }) {
   const t = usage.totals;
   const rest = uncounted(t);
@@ -104,6 +109,7 @@ export function SavingsView({ usage, sets, rangeLabel, rangeParam }: { usage: Us
               <Th>Set</Th>
               <Th className="text-right">Runs</Th>
               <Th className="text-right">High / med / low</Th>
+              <Th className="text-right">Would act in controlled</Th>
               <Th className="text-right">Errors</Th>
               <Th className="text-right">System One spend</Th>
               <Th className="text-right">LLM estimate</Th>
@@ -126,6 +132,10 @@ export function SavingsView({ usage, sets, rangeLabel, rangeParam }: { usage: Us
                 <Td numeric>
                   {formatShare(s.bandHigh, s.runs)} / {formatShare(s.bandMedium, s.runs)} / {formatShare(s.bandLow, s.runs)}
                 </Td>
+                <Td numeric>
+                  {formatCount(s.wouldActControlled)}
+                  {s.wouldActRoutes.length > 0 ? <span className="block text-xs text-bw-text-muted">{routeSplitLabel(s.wouldActRoutes)}</span> : null}
+                </Td>
                 <Td numeric>{formatCount(s.errors)}</Td>
                 <Td numeric>{formatUsd(s.systemOneCostMicroUsd)}</Td>
                 <Td numeric>{formatUsd(s.counterfactualMicroUsd)}</Td>
@@ -136,6 +146,10 @@ export function SavingsView({ usage, sets, rangeLabel, rangeParam }: { usage: Us
           </tbody>
         </Table>
         <p className="mt-3 text-xs text-bw-text-muted">Saved is an estimate: each run is compared with the cost of asking the comparator LLM the same questions.</p>
+        <p className="mt-1 text-xs text-bw-text-muted">
+          Would act in controlled counts high band runs whose policy says auto, in any stage, so a set in shadow shows what a move to controlled would do. Some routes, such as stop,
+          change nothing for the app. Runs from before 2026-10-07 are not counted.
+        </p>
       </section>
     </div>
   );
