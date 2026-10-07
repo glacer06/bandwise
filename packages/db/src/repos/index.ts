@@ -152,8 +152,25 @@ export interface RunPageFilter {
   status?: RunStatus;
   band?: Band;
   action?: Action;
+  /** Runs made by these agent tokens (actor_token_id). An empty list matches nothing. */
+  actorTokenIds?: readonly string[];
   from?: Date;
   to?: Date;
+}
+
+/** usage.get range: [from, to], optionally limited to sets and to the agent tokens that made the runs. */
+export interface RunTotalsRange {
+  from: Date;
+  to: Date;
+  setIds?: readonly string[];
+  /** An empty list matches nothing. */
+  actorTokenIds?: readonly string[];
+}
+
+/** An agent token's display fields: never the hash or the prefix. */
+export interface AgentTokenName {
+  id: string;
+  name: string;
 }
 
 /** One set's run totals for usage.get, read straight from runs until the usage_daily rollup lands. */
@@ -234,6 +251,25 @@ export function buildRepositories(opts: RepoOptions) {
       async getByHash(tx: TenantTx, hash: string) {
         const [row] = await agentTokens.findMany(tx, eq(s.agentTokens.hash, hash), 1);
         return row ?? null;
+      },
+      /** Names of these tokens in the transaction's org, revoked or not. Ids from another org match nothing. */
+      async namesByIds(tx: TenantTx, ids: readonly string[]): Promise<AgentTokenName[]> {
+        if (ids.length === 0) return [];
+        const t = s.agentTokens;
+        return drizzleOf(tx)
+          .select({ id: t.id, name: t.name })
+          .from(t)
+          .where(agentTokens.scope(tx, inArray(t.id, [...ids])))
+          .orderBy(asc(t.id));
+      },
+      /** Every token with this name in the transaction's org, revoked or not, so a rotated name keeps its history. */
+      async listByName(tx: TenantTx, name: string): Promise<AgentTokenName[]> {
+        const t = s.agentTokens;
+        return drizzleOf(tx)
+          .select({ id: t.id, name: t.name })
+          .from(t)
+          .where(agentTokens.scope(tx, eq(t.name, name)))
+          .orderBy(asc(t.id));
       },
     },
     orgWebhookSecrets: tenantRepo(s.orgWebhookSecrets, opts),
@@ -359,6 +395,7 @@ export function buildRepositories(opts: RepoOptions) {
       async listPage(tx: TenantTx, filter: RunPageFilter, page: PageReq) {
         const t = s.runs;
         if (filter.setIds !== undefined && filter.setIds.length === 0) return { data: [], nextCursor: null };
+        if (filter.actorTokenIds !== undefined && filter.actorTokenIds.length === 0) return { data: [], nextCursor: null };
         const { state: _state, ...columns } = getTableColumns(t);
         const where = and(
           filter.setId === undefined ? undefined : eq(t.setId, filter.setId),
@@ -369,6 +406,7 @@ export function buildRepositories(opts: RepoOptions) {
           filter.status === undefined ? undefined : eq(t.status, filter.status),
           filter.band === undefined ? undefined : eq(t.runBand, filter.band),
           filter.action === undefined ? undefined : eq(t.overallAction, filter.action),
+          filter.actorTokenIds === undefined ? undefined : inArray(t.actorTokenId, [...filter.actorTokenIds]),
           filter.from === undefined ? undefined : gte(t.createdAt, filter.from),
           filter.to === undefined ? undefined : lte(t.createdAt, filter.to),
         );
@@ -385,9 +423,10 @@ export function buildRepositories(opts: RepoOptions) {
         );
       },
       /** usage.get: per-set totals over [from, to]. */
-      async totalsBySet(tx: TenantTx, range: { from: Date; to: Date; setIds?: readonly string[] }): Promise<RunSetTotals[]> {
+      async totalsBySet(tx: TenantTx, range: RunTotalsRange): Promise<RunSetTotals[]> {
         const t = s.runs;
         if (range.setIds !== undefined && range.setIds.length === 0) return [];
+        if (range.actorTokenIds !== undefined && range.actorTokenIds.length === 0) return [];
         const n = (expr: SQL) => sql<number>`coalesce(${expr}, 0)::bigint`.mapWith(Number);
         return drizzleOf(tx)
           .select({
@@ -412,6 +451,7 @@ export function buildRepositories(opts: RepoOptions) {
                 gte(t.createdAt, range.from),
                 lte(t.createdAt, range.to),
                 range.setIds === undefined ? undefined : inArray(t.setId, [...range.setIds]),
+                range.actorTokenIds === undefined ? undefined : inArray(t.actorTokenId, [...range.actorTokenIds]),
               ),
             ),
           )
@@ -419,9 +459,10 @@ export function buildRepositories(opts: RepoOptions) {
           .orderBy(asc(t.setId));
       },
       /** usage.get: org totals per UTC day over [from, to], oldest first. Days without runs are left out. */
-      async totalsByDay(tx: TenantTx, range: { from: Date; to: Date; setIds?: readonly string[] }): Promise<RunDayTotals[]> {
+      async totalsByDay(tx: TenantTx, range: RunTotalsRange): Promise<RunDayTotals[]> {
         const t = s.runs;
         if (range.setIds !== undefined && range.setIds.length === 0) return [];
+        if (range.actorTokenIds !== undefined && range.actorTokenIds.length === 0) return [];
         const n = (expr: SQL) => sql<number>`coalesce(${expr}, 0)::bigint`.mapWith(Number);
         const day = sql<string>`to_char(${t.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`;
         return drizzleOf(tx)
@@ -442,6 +483,7 @@ export function buildRepositories(opts: RepoOptions) {
                 gte(t.createdAt, range.from),
                 lte(t.createdAt, range.to),
                 range.setIds === undefined ? undefined : inArray(t.setId, [...range.setIds]),
+                range.actorTokenIds === undefined ? undefined : inArray(t.actorTokenId, [...range.actorTokenIds]),
               ),
             ),
           )

@@ -1,5 +1,6 @@
 // The D3 observe operations through runOperation, on PGlite as the app role: usage.get per day,
-// and the review queue (list, resolve, dismiss, and an agent's answer that a person confirms).
+// the review queue (list, resolve, dismiss, and an agent's answer that a person confirms), and
+// runs and usage by the agent token that made them.
 
 import type { OperationId, Scope, TenantContext } from "@bandwise/core";
 import { repos, seedOrgs, type SeededOrg } from "@bandwise/db";
@@ -10,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authenticateBearer } from "../auth/bearer";
 import { OperationError } from "../operations/errors";
 import { runOperation, type OperationDeps } from "../operations/run-operation";
-import type { ReviewItemView, UsageView } from "../operations/views";
+import type { AgentTokenView, ReviewItemView, RunDetail, RunSummary, UsageView } from "../operations/views";
 
 const hasher = createTokenHasher("pepper-".repeat(6));
 const NICK = "nick@internal.test";
@@ -30,6 +31,16 @@ function session(org: SeededOrg, email: string, role: "owner" | "viewer"): Tenan
 }
 
 const owner = () => session(internal, NICK, "owner");
+
+/** A run-only agent token named `name`, as the hooks use. Returns its id. */
+async function namedToken(org: SeededOrg, name: string): Promise<string> {
+  const userId = Object.values(org.userIds)[0] ?? "";
+  const { hash } = hasher.mint("sa_live_", org.orgId);
+  const row = await t.db.withTenant(sys(org.orgId), (tx) =>
+    repos.agentTokens.insert(tx, { userId, name, client: "cli", hash, scopes: ["run"], roleCeiling: "editor", setIds: null, expiresAt: new Date(Date.now() + 86_400_000) }),
+  );
+  return row.id;
+}
 
 async function agent(org: SeededOrg, scopes: Scope[]) {
   const userId = org.userIds[NICK] ?? "";
@@ -77,7 +88,7 @@ const MONTH_START = (() => {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
 })();
 
-async function insertRun(org: SeededOrg, createdAt: Date, cost: number) {
+async function insertRun(org: SeededOrg, createdAt: Date, cost: number, actorTokenId: string | null = null) {
   const id = crypto.randomUUID();
   await t.db.withTenant(sys(org.orgId), (tx) =>
     repos.runs.insert(tx, {
@@ -88,6 +99,7 @@ async function insertRun(org: SeededOrg, createdAt: Date, cost: number) {
       channel: "production",
       rollout: "shadow",
       source: "api",
+      actorTokenId,
       keyMode: "platform",
       modelRequested: "jev-1.13.0",
       interfaceMajor: 1,
@@ -234,5 +246,94 @@ describe("review queue", () => {
     expect(out.resolution).toEqual({ value: true });
     expect(await feedbackFor(internal, replaced.id)).toMatchObject({ source: "reviewer", observed: true, userId: internal.userIds[NICK] });
     expect((await auditRows(internal, "review.confirm")).map((a) => a.targetId)).toEqual(expect.arrayContaining([kept.id, replaced.id]));
+  });
+});
+
+describe("runs by token", () => {
+  // A window of its own, after the per-day test's range.
+  const at = (hours: number) => new Date(MONTH_START + 5 * 86_400_000 + hours * 3_600_000);
+  const range = { from: at(0).toISOString(), to: at(24).toISOString() };
+  let nickHooks: string;
+  let simsHooks: string;
+  let simsRotated: string;
+  let acmeHooks: string;
+  let nickRun: string;
+  let simsRun: string;
+  let rotatedRun: string;
+  let forgedRun: string;
+
+  beforeAll(async () => {
+    nickHooks = await namedToken(internal, "nick-hooks");
+    simsHooks = await namedToken(internal, "sims-hooks");
+    // A rotated token keeps its name, so a name filter covers both.
+    simsRotated = await namedToken(internal, "sims-hooks");
+    acmeHooks = await namedToken(acme, "acme-hooks");
+    nickRun = await insertRun(internal, at(1), 3, nickHooks);
+    simsRun = await insertRun(internal, at(2), 5, simsHooks);
+    rotatedRun = await insertRun(internal, at(3), 7, simsRotated);
+    await insertRun(internal, at(4), 11);
+    await insertRun(acme, at(1), 13, acmeHooks);
+    // A run row naming another org's token: the name lookup runs in this org, so it reads nothing.
+    forgedRun = await insertRun(internal, at(5), 17, acmeHooks);
+  });
+
+  const list = async (ctx: TenantContext, extra: Record<string, unknown>) =>
+    (await ok<{ data: RunSummary[] }>(op("run.list", ctx, { ...range, ...extra }))).data;
+
+  it("shows the token id and name on each run summary", async () => {
+    const runs = await list(owner(), {});
+    const byId = new Map(runs.map((r) => [r.id, r]));
+    expect(byId.get(nickRun)).toMatchObject({ actorTokenId: nickHooks, actorTokenName: "nick-hooks" });
+    expect(byId.get(simsRun)).toMatchObject({ actorTokenId: simsHooks, actorTokenName: "sims-hooks" });
+    expect(byId.get(forgedRun)).toMatchObject({ actorTokenId: acmeHooks, actorTokenName: null });
+    expect(runs.find((r) => r.actorTokenId === null)?.actorTokenName).toBeNull();
+    expect(JSON.stringify(runs)).not.toContain("sa_live_");
+  });
+
+  it("filters run.list by token name or id", async () => {
+    expect((await list(owner(), { token: "sims-hooks" })).map((r) => r.id).sort()).toEqual([simsRun, rotatedRun].sort());
+    expect((await list(owner(), { token: nickHooks })).map((r) => r.id)).toEqual([nickRun]);
+    expect((await list(owner(), { token: simsRotated })).map((r) => r.id)).toEqual([rotatedRun]);
+  });
+
+  it("shows the token on run.get", async () => {
+    const detail = await ok<RunDetail>(op("run.get", owner(), { id: simsRun }));
+    expect(detail).toMatchObject({ actorTokenId: simsHooks, actorTokenName: "sims-hooks" });
+  });
+
+  it("splits usage.get totals by token", async () => {
+    const all = await ok<UsageView>(op("usage.get", owner(), range));
+    expect(all.token).toBeNull();
+    expect(all.totals.systemOneCostMicroUsd).toBe(3 + 5 + 7 + 11 + 17);
+    const sims = await ok<UsageView>(op("usage.get", owner(), { ...range, token: "sims-hooks" }));
+    expect(sims.token).toBe("sims-hooks");
+    expect(sims.totals).toMatchObject({ runs: 2, systemOneCostMicroUsd: 12 });
+    expect(sims.days.reduce((n, d) => n + d.runs, 0)).toBe(2);
+    const nick = await ok<UsageView>(op("usage.get", owner(), { ...range, token: nickHooks }));
+    expect(nick).toMatchObject({ token: "nick-hooks", totals: { runs: 1, systemOneCostMicroUsd: 3 } });
+  });
+
+  it("never finds another org's token by name or id", async () => {
+    for (const token of ["acme-hooks", acmeHooks]) {
+      expect((await refused(op("run.list", owner(), { ...range, token }))).code).toBe("not_found");
+      expect((await refused(op("usage.get", owner(), { ...range, token }))).code).toBe("not_found");
+    }
+    const ada = session(acme, "ada@acme.test", "owner");
+    for (const token of ["sims-hooks", simsHooks]) {
+      expect((await refused(op("run.list", ada, { ...range, token }))).code).toBe("not_found");
+    }
+    const acmeRuns = await list(ada, {});
+    expect(acmeRuns.map((r) => r.actorTokenName)).toEqual(["acme-hooks"]);
+    expect(JSON.stringify(acmeRuns)).not.toContain("sims-hooks");
+  });
+
+  it("lists the org's agent tokens by name, without hashes, for this org only", async () => {
+    const tokens = (await ok<{ data: AgentTokenView[] }>(op("agent_token.list", owner(), { limit: 200 }))).data;
+    expect(tokens.map((x) => x.name)).toEqual(expect.arrayContaining(["nick-hooks", "sims-hooks"]));
+    expect(tokens.map((x) => x.name)).not.toContain("acme-hooks");
+    for (const x of tokens) {
+      expect(Object.keys(x)).not.toContain("hash");
+      expect(Object.keys(x)).not.toContain("prefix");
+    }
   });
 });

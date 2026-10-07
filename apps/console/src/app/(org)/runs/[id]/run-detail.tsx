@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Facts, JsonBlock } from "~/components/observe/bits";
 import { decisionsOf, DecisionsTable } from "~/components/observe/decisions";
+import { MadeBy } from "~/components/observe/made-by";
 import { decidingMarker, runRulers } from "~/components/observe/ruler-math";
 import { RunRuler } from "~/components/observe/run-ruler";
 import { SetLabel, type SetDirectory } from "~/components/observe/sets";
@@ -117,6 +118,7 @@ export function RunDetailView({ run, sets, spec }: { run: RunDetail; sets: SetDi
               { label: "Overall action", value: ACTION_LABEL[run.overallAction] },
               { label: "Route", value: run.route ?? "None" },
               { label: "Source", value: SOURCE_LABEL[run.source] },
+              { label: "Made by", value: <MadeBy tokenId={run.actorTokenId} tokenName={run.actorTokenName} /> },
               { label: "Latency", value: formatLatency(run.latencyMs) },
               { label: "Model asked for", value: <span className="font-mono text-xs">{run.modelRequested}</span> },
               { label: "Model that answered", value: <span className="font-mono text-xs">{run.modelResolved ?? "Unknown"}</span> },

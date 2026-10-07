@@ -3,6 +3,7 @@
 
 import {
   Action,
+  AgentClient,
   Band,
   Channel,
   GateResult,
@@ -17,6 +18,7 @@ import {
   ReviewItemKind,
   ReviewItemReason,
   ReviewItemStatus,
+  Role,
   RolloutStage,
   RunId,
   RunRecordSource,
@@ -132,6 +134,10 @@ export const RunSummary = z.object({
   counterfactualMicroUsd: MicroUsd,
   savingsMicroUsd: MicroUsd,
   errorCode: z.string().nullable(),
+  /** The agent token that made the run. Null for sessions, app tokens and jobs. */
+  actorTokenId: TokenId.nullable(),
+  /** That token's name, for example "nick-hooks". Null when there is no token or it cannot be read. */
+  actorTokenName: z.string().nullable(),
   createdAt: IsoTimestamp,
 });
 export type RunSummary = z.infer<typeof RunSummary>;
@@ -186,10 +192,15 @@ export const UsageDay = z.object({
 });
 export type UsageDay = z.infer<typeof UsageDay>;
 
-/** usage.get: run totals per set over [from, to], and totals per UTC day. */
+/**
+ * usage.get: run totals per set over [from, to], and totals per UTC day. With the token filter,
+ * only runs that token made, and `token` names it.
+ */
 export const UsageView = z.object({
   from: IsoTimestamp,
   to: IsoTimestamp,
+  /** The agent token name the totals are limited to, or null for every caller. */
+  token: z.string().nullable(),
   sets: z.array(Totals.extend({ setId: SetId, slug: z.string() })),
   totals: Totals,
   days: z.array(UsageDay),
@@ -220,3 +231,18 @@ export const ReviewItemView = z.object({
   createdAt: IsoTimestamp,
 });
 export type ReviewItemView = z.infer<typeof ReviewItemView>;
+
+/** agent_token.list items: the display fields only. Never the hash or the prefix. */
+export const AgentTokenView = z.object({
+  id: TokenId,
+  name: z.string(),
+  client: AgentClient,
+  userId: UserId,
+  roleCeiling: Role,
+  scopes: z.array(z.string()),
+  expiresAt: IsoTimestamp,
+  revokedAt: IsoTimestamp.nullable(),
+  lastUsedAt: IsoTimestamp.nullable(),
+  createdAt: IsoTimestamp,
+});
+export type AgentTokenView = z.infer<typeof AgentTokenView>;

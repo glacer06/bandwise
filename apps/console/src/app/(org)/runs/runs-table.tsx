@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ACTION_LABEL, formatLatency, formatUsd, formatWhen, SOURCE_LABEL, STATUS_LABEL } from "~/components/format";
 import type { RulerGroup, RulerMarker } from "~/components/observe/ruler-math";
+import { MadeBy } from "~/components/observe/made-by";
 import { MiniRuler } from "~/components/observe/run-ruler";
 import { SetLabel, type SetDirectory } from "~/components/observe/sets";
 import { Badge, BandBadge, RolloutBadge, Table, Td, Th } from "~/components/ui";
@@ -19,6 +20,7 @@ export function RunsTable({ runs, rulers, sets, now }: { runs: readonly RunSumma
           <Th>When</Th>
           <Th>Run band</Th>
           <Th>Set</Th>
+          <Th>Made by</Th>
           <Th>Stage at run</Th>
           <Th>Action</Th>
           <Th>Status</Th>
@@ -49,6 +51,9 @@ export function RunsTable({ runs, rulers, sets, now }: { runs: readonly RunSumma
                   <SetLabel sets={sets} setId={r.setId} compact stage={false} />
                   <span className="text-xs text-bw-text-muted">{r.channel}</span>
                 </span>
+              </Td>
+              <Td className="whitespace-nowrap">
+                <MadeBy tokenId={r.actorTokenId} tokenName={r.actorTokenName} />
               </Td>
               <Td>
                 <RolloutBadge stage={r.rollout} />

@@ -210,10 +210,13 @@ describe("parseArgs for remote commands", () => {
     expect(parseArgs(["rollback", "triage", "--channel", "staging", "--to", "2"])).toEqual({ kind: "rollback", set: "triage", channel: "staging", to: 2, json: false });
     expect(parseArgs(["rollout", "triage", "controlled", "--reason", "week one"])).toEqual({ kind: "rollout", set: "triage", stage: "controlled", channel: "production", reason: "week one", json: false });
     expect(parseArgs(["report", "--remote", "--since", "7d"])).toEqual({ kind: "report-remote", since: { text: "7d", ms: 7 * 86_400_000 }, json: false });
+    expect(parseArgs(["report", "--remote", "--token", "laptop-hooks", "--json"])).toEqual({ kind: "report-remote", token: "laptop-hooks", json: true });
     expect(parseArgs(["hook", "Stop", "--set", "s.json", "--remote-set", "done"])).toMatchObject({ kind: "hook", remoteSet: "done" });
   });
 
   it("refuses bad input", () => {
+    expect(parseArgs(["report", "--token", "laptop-hooks"])).toMatchObject({ kind: "error", message: "--token filters runs on the server, so it needs --remote" });
+    expect(parseArgs(["report", "--remote", "--token"])).toMatchObject({ kind: "error" });
     expect(parseArgs(["spec", "edit", "x"])).toMatchObject({ kind: "error" });
     expect(parseArgs(["spec", "pull"])).toMatchObject({ kind: "error", message: "bandwise spec pull needs a set" });
     expect(parseArgs(["rollout", "triage", "live"])).toMatchObject({ kind: "error" });
@@ -383,6 +386,26 @@ describe("remote commands", () => {
     expect(text.stdout).toContain("2026-09-30 to 2026-10-01");
     expect(text.stdout).toContain("done-check: 2 runs (1 error), bands high 1 / medium 0 / low 1, System One $0.000120, estimated savings $0.002000, LLM calls avoided 1");
     expect(text.stdout).toContain("total: 3 runs");
+  });
+
+  it("report --remote --token sends the token filter and names the token per set row", async () => {
+    const api = fakeApi({ "GET /usage": { status: 200, body: { ...USAGE_REPLY, token: "laptop-hooks" } } });
+    const out = await main(["report", "--remote", "--token", "laptop-hooks", "--json"], { env: ENV, fetch: api.fetch });
+    expect(out.exitCode).toBe(0);
+    expect(api.seen.at(-1)?.query).toEqual({ token: "laptop-hooks" });
+    const report = JSON.parse(out.stdout) as { token: string | null; sets: Array<{ set: string; token?: string }> };
+    expect(report.token).toBe("laptop-hooks");
+    expect(report.sets.map((s) => [s.set, s.token])).toEqual([
+      ["done-check", "laptop-hooks"],
+      ["model-tier", "laptop-hooks"],
+    ]);
+    const text = await main(["report", "--remote", "--token", "laptop-hooks"], { env: ENV, fetch: api.fetch });
+    expect(text.stdout).toContain(", token laptop-hooks.");
+
+    const plain = fakeApi({ "GET /usage": { status: 200, body: USAGE_REPLY } });
+    const all = JSON.parse((await main(["report", "--remote", "--json"], { env: ENV, fetch: plain.fetch })).stdout) as { token: string | null; sets: object[] };
+    expect(all.token).toBeNull();
+    expect(all.sets.every((s) => !("token" in s))).toBe(true);
   });
 
   it("never prints the token, even when the server echoes it", async () => {

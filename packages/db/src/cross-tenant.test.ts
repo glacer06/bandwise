@@ -524,6 +524,17 @@ const PROBES: Record<string, Probe> = {
     expect(hash).toBeDefined();
     expect(await inA((tx) => r.agentTokens.getByHash(tx, hash ?? ""))).toBeNull();
   },
+  "agentTokens.namesByIds": async (r) => {
+    const id = created["agentTokens"]?.b ?? "";
+    expect((await inB((tx) => r.agentTokens.namesByIds(tx, [id]))).map((x) => x.id)).toEqual([id]);
+    expect(await inA((tx) => r.agentTokens.namesByIds(tx, [id]))).toEqual([]);
+  },
+  "agentTokens.listByName": async (r) => {
+    const name = await inB(async (tx) => (await r.agentTokens.get(tx, created["agentTokens"]?.b ?? ""))?.name);
+    expect(name).toBeDefined();
+    const ids = (await inA((tx) => r.agentTokens.listByName(tx, name ?? ""))).map((x) => x.id);
+    expect(ids).not.toContain(created["agentTokens"]?.b);
+  },
   "appTokens.getByHash": async (r) => {
     const hash = await inB(async (tx) => (await r.appTokens.get(tx, created["appTokens"]?.b ?? ""))?.hash);
     expect(hash).toBeDefined();

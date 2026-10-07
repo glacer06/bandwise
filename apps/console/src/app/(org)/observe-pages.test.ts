@@ -48,7 +48,20 @@ const summary = {
   counterfactualMicroUsd: 3100,
   savingsMicroUsd: 3058,
   errorCode: null,
+  actorTokenId: ITEM,
+  actorTokenName: "sims-hooks",
   createdAt: NOW,
+};
+
+const tokenList: Answer = {
+  status: "ok",
+  output: {
+    data: [
+      { id: ITEM, name: "sims-hooks", client: "cli", userId: SET, roleCeiling: "editor", scopes: ["run"], expiresAt: NOW, revokedAt: null, lastUsedAt: null, createdAt: NOW },
+      { id: RUN, name: "nick-hooks", client: "cli", userId: SET, roleCeiling: "editor", scopes: ["run"], expiresAt: NOW, revokedAt: null, lastUsedAt: null, createdAt: NOW },
+    ],
+    nextCursor: null,
+  },
 };
 
 const detail = {
@@ -69,7 +82,7 @@ async function html(page: Promise<ReactElement>): Promise<string> {
 const sp = (v: Record<string, string> = {}) => Promise.resolve(v);
 
 beforeEach(() => {
-  answers = { "set.list": setList };
+  answers = { "set.list": setList, "agent_token.list": tokenList };
 });
 
 describe("runs", () => {
@@ -82,6 +95,17 @@ describe("runs", () => {
     expect(out).toContain("$0.000042");
     expect(out).toContain("Older runs");
     expect(inputs["run.list"]).toMatchObject({ band: "medium", limit: "50" });
+  });
+
+  it("shows which token made each run, and filters by token name", async () => {
+    answers["run.list"] = { status: "ok", output: { data: [summary, { ...summary, id: SET, actorTokenId: null, actorTokenName: null }], nextCursor: null } };
+    const { default: RunsPage } = await import("./runs/page");
+    const out = await html(RunsPage({ searchParams: sp({ token: "sims-hooks" }) }));
+    expect(out).toContain("Made by");
+    expect(out).toContain('<option value="nick-hooks">nick-hooks</option>');
+    expect(out).toContain('href="/runs?token=sims-hooks"');
+    expect(out).toContain("No token");
+    expect(inputs["run.list"]).toMatchObject({ token: "sims-hooks" });
   });
 
   it("explains an empty list, and shows an operation error", async () => {
@@ -124,6 +148,8 @@ describe("runs", () => {
     expect(out).toContain("model is an alias");
     expect(out).toContain("Not stored.");
     expect(out).toContain(`/review/${ITEM}?run=${RUN}`);
+    expect(out).toContain("Made by");
+    expect(out).toContain("sims-hooks");
   });
 });
 
@@ -136,6 +162,7 @@ describe("savings", () => {
       output: {
         from: new Date(Date.now() - 7 * 86_400_000).toISOString(),
         to: NOW,
+        token: null,
         totals,
         sets: [{ ...totals, setId: SET, slug: "done-check" }],
         days: [{ day: today, runs: 3, errors: 0, systemOneCostMicroUsd: 120, counterfactualMicroUsd: 9000, savingsMicroUsd: 8880, llmCallsAvoided: 3 }],
@@ -154,9 +181,19 @@ describe("savings", () => {
 
   it("explains an empty range", async () => {
     const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
-    answers["usage.get"] = { status: "ok", output: { from: NOW, to: NOW, totals: zero, sets: [], days: [] } };
+    answers["usage.get"] = { status: "ok", output: { from: NOW, to: NOW, token: null, totals: zero, sets: [], days: [] } };
     const { default: SavingsPage } = await import("./savings/page");
     expect(await html(SavingsPage({ searchParams: sp() }))).toContain("Nothing on the trail yet.");
+  });
+
+  it("filters by token, and says when a token made no runs in the range", async () => {
+    const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
+    answers["usage.get"] = { status: "ok", output: { from: NOW, to: NOW, token: "nick-hooks", totals: zero, sets: [], days: [] } };
+    const { default: SavingsPage } = await import("./savings/page");
+    const out = await html(SavingsPage({ searchParams: sp({ token: "nick-hooks" }) }));
+    expect(inputs["usage.get"]).toMatchObject({ token: "nick-hooks" });
+    expect(out).toContain("Made by");
+    expect(out).toContain("No runs match these filters");
   });
 });
 

@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 import { FilterForm } from "~/components/observe/filter-form";
 import { SavingsFirstRun } from "~/components/observe/first-runs";
-import { param, rangeOf, rangeStart, type SearchParams } from "~/components/observe/filters";
+import { param, rangeOf, rangeStart, type SearchParams, tokenParam } from "~/components/observe/filters";
 import { loadSets, setOptions } from "~/components/observe/sets";
+import { loadTokenOptions } from "~/components/observe/tokens";
 import { OperationFailed } from "~/components/shell/operation-failed";
-import { PageHeader } from "~/components/ui";
+import { buttonClasses, EmptyState, PageHeader } from "~/components/ui";
 import { consoleOperation } from "~/server/console-operation";
 import type { UsageView } from "~/server/operations/views";
 
@@ -22,8 +25,9 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
   const range = RANGES.find((r) => r.value === asked) ?? RANGES[0];
   const from = rangeStart(range.value, now) ?? now;
   const set = param(sp, "set");
-  const input = { from: from.toISOString(), to: now.toISOString(), ...(set === undefined ? {} : { set }) };
-  const [sets, res] = await Promise.all([loadSets(), consoleOperation("usage.get", input)]);
+  const token = tokenParam(sp);
+  const input = { from: from.toISOString(), to: now.toISOString(), ...(set === undefined ? {} : { set }), ...(token === undefined ? {} : { token }) };
+  const [sets, tokens, res] = await Promise.all([loadSets(), loadTokenOptions(), consoleOperation("usage.get", input)]);
 
   const header = (
     <>
@@ -35,6 +39,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
         fields={[
           { name: "range", label: "Time", options: RANGES, fallback: "7d" },
           { name: "set", label: "Set", options: [{ value: "", label: "All sets" }, ...setOptions(sets)] },
+          { name: "token", label: "Made by", options: [{ value: "", label: "Any token" }, ...tokens] },
         ]}
       />
     </>
@@ -54,7 +59,13 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
     return (
       <>
         {header}
-        <SavingsFirstRun />
+        {set === undefined && token === undefined ? (
+          <SavingsFirstRun />
+        ) : (
+          <EmptyState title="No runs match these filters" action={<Link href="/savings" className={buttonClasses("secondary", "sm")}>Clear filters</Link>}>
+            Try a longer time range, another set or another token.
+          </EmptyState>
+        )}
       </>
     );
   }

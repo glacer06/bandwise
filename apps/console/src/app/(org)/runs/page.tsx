@@ -9,6 +9,7 @@ import { mapLimit } from "~/components/observe/map-limit";
 import { decidingMarker, runRulers } from "~/components/observe/ruler-math";
 import { loadSets, setOptions } from "~/components/observe/sets";
 import { loadSpecs } from "~/components/observe/specs";
+import { loadTokenOptions } from "~/components/observe/tokens";
 import { OperationFailed } from "~/components/shell/operation-failed";
 import { buttonClasses, EmptyState, PageHeader } from "~/components/ui";
 import { consoleOperation } from "~/server/console-operation";
@@ -16,7 +17,7 @@ import type { RunDetail, RunSummary } from "~/server/operations/views";
 
 import { type RowRuler, RunsTable } from "./runs-table";
 
-const FILTER_KEYS = ["set", "channel", "status", "source", "band", "action"] as const;
+const FILTER_KEYS = ["set", "channel", "status", "source", "band", "action", "token"] as const;
 
 /**
  * Each row's tiny ruler: the decision that set the run band, at the lines of the version it ran on.
@@ -42,7 +43,7 @@ async function rowRulers(runs: readonly RunSummary[], sets: Awaited<ReturnType<t
 export default async function RunsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const now = new Date();
-  const [sets, res] = await Promise.all([loadSets(), consoleOperation("run.list", runListInput(sp, now))]);
+  const [sets, tokens, res] = await Promise.all([loadSets(), loadTokenOptions(), consoleOperation("run.list", runListInput(sp, now))]);
 
   const fields = [
     { name: "range", label: "Time", options: [...RANGES.map((r) => ({ value: r.value, label: r.label })), { value: "all", label: "All time" }], fallback: "7d" },
@@ -51,6 +52,7 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
     { name: "status", label: "Status", options: optionsOf("Any status", STATUS_LABEL) },
     { name: "source", label: "Source", options: optionsOf("Any source", SOURCE_LABEL) },
     { name: "band", label: "Run band", options: optionsOf("Any band", { high: "High", medium: "Medium", low: "Low" }) },
+    { name: "token", label: "Made by", options: [{ value: "", label: "Any token" }, ...tokens] },
   ];
 
   let body;

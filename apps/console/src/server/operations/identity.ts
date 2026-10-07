@@ -14,8 +14,10 @@ import {
 import { z } from "zod";
 
 import { decideApproval, getApproval, listApprovals } from "../manage/approvals";
+import { listAgentTokens } from "../manage/tokens";
 import { defineOperation, operationGroup, placeholderInput, placeholderOutput, type RiskLevel } from "./define";
 import { isWriteScope, listInput, listOutput, placeholderListOutput } from "./schemas";
+import { AgentTokenView } from "./views";
 
 /**
  * GET /approvals/{id}: { id, opId, status, reason, input, ifMatch, requestedBy, createdAt, expiresAt,
@@ -110,10 +112,10 @@ export const identityOperations = operationGroup(
   }),
 
   defineOperation("agent_token.list", {
-    summary: "List agent tokens.",
+    summary: "List agent tokens: id, name, client, owner, scopes and dates. Never the hash or the prefix.",
     input: listInput({}),
-    // shape: Phase 2, owner Platform / Tenancy
-    output: placeholderListOutput(),
+    output: listOutput(AgentTokenView),
+    handler: listAgentTokens,
   }),
 
   defineOperation("agent_token.create", {

@@ -42,6 +42,8 @@ describe("filters", () => {
       from: "2026-09-30T12:00:00.000Z",
     });
     expect(runListInput({ range: "all", set: "bad slug!" }, NOW)).toEqual({ limit: "50" });
+    expect(runListInput({ range: "all", token: "sims-hooks" }, NOW)).toEqual({ limit: "50", token: "sims-hooks" });
+    expect(runListInput({ range: "all", token: "x".repeat(201) }, NOW)).toEqual({ limit: "50" });
     expect(runListInput({}, NOW)["from"]).toBe("2026-09-24T12:00:00.000Z");
   });
 

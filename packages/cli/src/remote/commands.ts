@@ -21,7 +21,7 @@ export type RemoteCommand =
   | { kind: "publish"; set: string; channel: Channel; changelog?: string; ifMatch?: string; json: boolean }
   | { kind: "rollback"; set: string; channel: Channel; to?: number; json: boolean }
   | { kind: "rollout"; set: string; stage: Stage; channel: Channel; reason?: string; json: boolean }
-  | { kind: "report-remote"; since?: { text: string; ms: number }; set?: string; json: boolean };
+  | { kind: "report-remote"; since?: { text: string; ms: number }; set?: string; token?: string; json: boolean };
 
 export interface RemoteDeps {
   client: ApiClient;
@@ -229,7 +229,7 @@ function summaryLine(s: RemoteSetSummary): string {
 /** Per-set spend and savings from usage.get, which sums every run in the range on the server. */
 async function reportRemote(cmd: Extract<RemoteCommand, { kind: "report-remote" }>, { client, now = Date.now }: RemoteDeps): Promise<CommandOutput> {
   const from = cmd.since === undefined ? undefined : new Date(now() - cmd.since.ms).toISOString();
-  const usage = await client.request("GET", "/usage", { query: { from, set: cmd.set } });
+  const usage = await client.request("GET", "/usage", { query: { from, set: cmd.set, token: cmd.token } });
   if (!usage.ok) return fail(usage.error, cmd.json);
   const b = isObj(usage.body) ? usage.body : {};
   const sets = (Array.isArray(b["sets"]) ? b["sets"] : [])
@@ -238,10 +238,15 @@ async function reportRemote(cmd: Extract<RemoteCommand, { kind: "report-remote" 
     .sort((x, y) => x.set.localeCompare(y.set));
   const totals = summarizeUsageRow("total", isObj(b["totals"]) ? b["totals"] : {});
   const range = { from: typeof b["from"] === "string" ? b["from"] : (from ?? null), to: typeof b["to"] === "string" ? b["to"] : null };
-  if (cmd.json) return json({ since: cmd.since?.text ?? null, ...range, set: cmd.set ?? null, sets, totals });
+  // The server names the token it filtered on, so an id given to --token still reads as a name.
+  const token = typeof b["token"] === "string" ? b["token"] : (cmd.token ?? null);
+  if (cmd.json) {
+    const rows = token === null ? sets : sets.map((s) => ({ ...s, token }));
+    return json({ since: cmd.since?.text ?? null, ...range, set: cmd.set ?? null, token, sets: rows, totals });
+  }
 
   const day = (iso: string | null) => (iso === null ? "?" : iso.slice(0, 10));
-  const lines = [`Bandwise report from ${new URL(client.baseUrl).host}, ${day(range.from)} to ${day(range.to)}${cmd.set !== undefined ? `, set ${cmd.set}` : ""}.`];
+  const lines = [`Bandwise report from ${new URL(client.baseUrl).host}, ${day(range.from)} to ${day(range.to)}${cmd.set !== undefined ? `, set ${cmd.set}` : ""}${token !== null ? `, token ${token}` : ""}.`];
   if (sets.length === 0) lines.push("No runs.");
   for (const s of sets) lines.push(summaryLine(s));
   if (sets.length > 1) lines.push(summaryLine(totals));
