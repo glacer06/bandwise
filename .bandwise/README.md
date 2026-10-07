@@ -4,12 +4,12 @@ These are the question sets that run as Claude Code hooks on this repository. Ea
 
 | Set | Hook event | What it decides |
 |---|---|---|
-| `sets/done-check.json` | `Stop` | Is the request finished, or is work left, a claim unchecked or work nobody asked for (logged only)? |
+| `sets/done-check.json` | `Stop` | Is the request finished, or is work left, a claim unchecked, work nobody asked for (logged only) or a wait on CI or another outside event (the agent stops)? |
 | `sets/action-risk-gate.json` | `PreToolUse` (Bash, Edit, Write) | Should a person confirm this command or file change first? |
 | `sets/model-tier.json` | `UserPromptSubmit` | Is the task mechanical, standard or hard? |
 | `sets/launch-profile.json` | none: `bandwise launch` | Which profile in `profiles.json` should a new session start with? |
 
-Every set starts in `shadow`. It runs, writes a receipt to `~/.bandwise/receipts.jsonl` and changes nothing in the session. The rollout stage is the `--rollout` flag on each hook command, not a field in the spec.
+Every set starts in `shadow`. It runs, writes a receipt to `~/.bandwise/receipts.jsonl` and changes nothing in the session. The rollout stage is the `--rollout` flag on each hook command, not a field in the spec. In hosted mode (`BANDWISE_TOKEN` set) the server's stage for the set decides and the flag is ignored; see `docs/runbooks/dogfood.md` section 3.
 
 `states/<set>/` holds example and borderline states for each set. CI runs every one of them with `bandwise run --local`, so a spec that stops validating fails the build.
 

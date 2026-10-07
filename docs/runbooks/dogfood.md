@@ -129,6 +129,16 @@ One set at a time, after about a week of receipts, and only when you say so.
 
 To step back, change it to `--rollout shadow` again. That is never gated.
 
+**In hosted mode (`BANDWISE_TOKEN` set), the server's stage decides, and the `--rollout` flag in `.claude/settings.json` is ignored.** Read the hosted runs, not only your local receipts: `pnpm bandwise report --remote --since 7d --set <set>`, or `/runs` in the console filtered by set and band. Then move the production channel, either from the set's Releases panel in the console, or with the CLI token:
+
+```sh
+bwa rollout <set> controlled --reason "NSI-735: <what you read>"
+```
+
+The CLI call waits for a person: it prints an approval link, and you approve it at `/approvals` in the console. The next hook call picks up the new stage with no redeploy. To step back, `bwa rollout <set> shadow` or `paused`; both are never gated.
+
+Read the would-have-acted runs before you move, and label them in your head as right or wrong. On 2026-10-07 the first read-out (27 hosted hours) found that `done-check` would have sent the agent back 8 times on real work and was wrong all 8 times. Seven were cloud-session wake-ups read as the request, and every one was an agent correctly waiting on CI. That led to two fixes: the hook now skips harness envelopes, and `done-check` has a `waiting_on_event` outcome.
+
 ## Launch profiles (NSI-727, NSI-741)
 
 `model-tier` can only advise inside a session. `bandwise launch` picks before one starts, from `.bandwise/profiles.json`, and starts Claude Code with that profile's `--model` and `--effort`:

@@ -60,8 +60,19 @@ function textOf(content: unknown): string {
 }
 
 /**
+ * Messages the harness writes into a session on its own, such as a cloud session's queued
+ * notifications or a PR event that wakes it. They arrive as user turns but nobody typed them, so
+ * they are not a request. The dogfood receipts of 2026-10-06 read them as one.
+ */
+const HARNESS_ENVELOPE = /^<(?:task-notification|wake|webhook-payload|child-session-event)[\s>]/;
+
+export function isHarnessEnvelope(text: string): boolean {
+  return HARNESS_ENVELOPE.test(text.trimStart());
+}
+
+/**
  * The last thing the user typed and the agent's final text, from a Claude Code transcript (JSONL).
- * Tool results and meta lines are not user requests.
+ * Tool results, meta lines and harness envelopes are not user requests.
  */
 export function lastExchange(transcript: string): { request: string | undefined; lastReply: string | undefined } {
   let request: string | undefined;
@@ -78,6 +89,7 @@ export function lastExchange(transcript: string): { request: string | undefined;
     const text = textOf(entry["message"]["content"]).trim();
     if (text === "") continue;
     if (entry["type"] === "user") {
+      if (isHarnessEnvelope(text)) continue;
       request = text;
       lastReply = undefined;
     } else if (entry["type"] === "assistant") {
@@ -116,7 +128,8 @@ export function taskStats(transcript: string): TaskStats | null {
     if (!isObj(entry) || !isObj(entry["message"]) || entry["isMeta"] === true || entry["isSidechain"] === true) continue;
     const content = entry["message"]["content"];
     if (entry["type"] === "user") {
-      if (textOf(content).trim() === "") continue; // A tool result, not a request.
+      const text = textOf(content).trim();
+      if (text === "" || isHarnessEnvelope(text)) continue; // A tool result or a harness message, not a request.
       const at = typeof entry["timestamp"] === "string" ? Date.parse(entry["timestamp"]) : Number.NaN;
       stats = { requestAt: Number.isNaN(at) ? null : at, turns: 0, toolCalls: 0 };
       ids = new Set();
@@ -138,7 +151,7 @@ type Mapped = { kind: "skip" } | { kind: "run"; candidate: Record<string, unknow
 export function mapHookInput(event: HookEvent, input: Record<string, unknown>, readTranscript: (path: string) => string): Mapped {
   if (event === "UserPromptSubmit") {
     const prompt = str(input["prompt"]);
-    return prompt === undefined || prompt.trim() === "" ? { kind: "skip" } : { kind: "run", candidate: { prompt } };
+    return prompt === undefined || prompt.trim() === "" || isHarnessEnvelope(prompt) ? { kind: "skip" } : { kind: "run", candidate: { prompt } };
   }
   if (event === "PreToolUse") {
     const tool = str(input["tool_name"]);
