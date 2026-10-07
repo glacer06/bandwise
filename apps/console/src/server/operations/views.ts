@@ -171,6 +171,8 @@ const Totals = z.object({
   bandHigh: TokenCount,
   bandMedium: TokenCount,
   bandLow: TokenCount,
+  /** Runs that would act in controlled: run band high and policy action auto (ADR-010 Amendment 1). */
+  wouldActControlled: TokenCount,
   errors: TokenCount,
   inputTokens: TokenCount,
   outputTokens: TokenCount,
@@ -201,7 +203,14 @@ export const UsageView = z.object({
   to: IsoTimestamp,
   /** The agent token name the totals are limited to, or null for every caller. */
   token: z.string().nullable(),
-  sets: z.array(Totals.extend({ setId: SetId, slug: z.string() })),
+  sets: z.array(
+    Totals.extend({
+      setId: SetId,
+      slug: z.string(),
+      /** The would-act runs by route, most first. A route such as "stop" may change nothing for the host. */
+      wouldActRoutes: z.array(z.object({ route: z.string().nullable(), runs: TokenCount })),
+    }),
+  ),
   totals: Totals,
   days: z.array(UsageDay),
 });

@@ -128,6 +128,7 @@ export function createRunSink(deps: RunSinkDeps): RunSink {
       decisions: result.decisions,
       runBand: result.runBand,
       overallAction: result.overallAction,
+      policyAction: result.policyAction,
       route: result.route,
       warnings: result.warnings,
       inputTokens: cost.systemOneInputTokens,

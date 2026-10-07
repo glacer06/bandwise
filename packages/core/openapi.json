@@ -20566,6 +20566,22 @@
               "escalate_to_llm"
             ]
           },
+          "policyAction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "review",
+                  "fallback",
+                  "escalate_to_llm"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "route": {
             "type": [
               "string",
@@ -20723,6 +20739,7 @@
           "decisions",
           "runBand",
           "overallAction",
+          "policyAction",
           "route",
           "cost",
           "warnings"
@@ -22100,6 +22117,11 @@
                   "minimum": 0,
                   "maximum": 9007199254740991
                 },
+                "wouldActControlled": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "errors": {
                   "type": "integer",
                   "minimum": 0,
@@ -22141,6 +22163,29 @@
                 },
                 "slug": {
                   "type": "string"
+                },
+                "wouldActRoutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "route": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "runs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "route",
+                      "runs"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -22148,6 +22193,7 @@
                 "bandHigh",
                 "bandMedium",
                 "bandLow",
+                "wouldActControlled",
                 "errors",
                 "inputTokens",
                 "outputTokens",
@@ -22156,7 +22202,8 @@
                 "savingsMicroUsd",
                 "llmCallsAvoided",
                 "setId",
-                "slug"
+                "slug",
+                "wouldActRoutes"
               ]
             }
           },
@@ -22179,6 +22226,11 @@
                 "maximum": 9007199254740991
               },
               "bandLow": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "wouldActControlled": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 9007199254740991
@@ -22224,6 +22276,7 @@
               "bandHigh",
               "bandMedium",
               "bandLow",
+              "wouldActControlled",
               "errors",
               "inputTokens",
               "outputTokens",

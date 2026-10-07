@@ -155,7 +155,7 @@ describe("runs", () => {
 
 describe("savings", () => {
   it("shows totals, a bar per day and the per set table", async () => {
-    const totals = { runs: 3, bandHigh: 1, bandMedium: 2, bandLow: 0, errors: 0, inputTokens: 10, outputTokens: 1, systemOneCostMicroUsd: 120, counterfactualMicroUsd: 9000, savingsMicroUsd: 8880, llmCallsAvoided: 3 };
+    const totals = { runs: 3, bandHigh: 1, bandMedium: 2, bandLow: 0, wouldActControlled: 1, errors: 0, inputTokens: 10, outputTokens: 1, systemOneCostMicroUsd: 120, counterfactualMicroUsd: 9000, savingsMicroUsd: 8880, llmCallsAvoided: 3 };
     const today = NOW.slice(0, 10);
     answers["usage.get"] = {
       status: "ok",
@@ -164,7 +164,7 @@ describe("savings", () => {
         to: NOW,
         token: null,
         totals,
-        sets: [{ ...totals, setId: SET, slug: "done-check" }],
+        sets: [{ ...totals, setId: SET, slug: "done-check", wouldActRoutes: [{ route: "continue", runs: 1 }] }],
         days: [{ day: today, runs: 3, errors: 0, systemOneCostMicroUsd: 120, counterfactualMicroUsd: 9000, savingsMicroUsd: 8880, llmCallsAvoided: 3 }],
       },
     };
@@ -176,18 +176,20 @@ describe("savings", () => {
     expect(out).toContain("The same calls on the LLM would have cost about $0.009.");
     expect(out).toContain("How this is computed");
     expect(out).toContain("Shadow");
+    expect(out).toContain("Would act in controlled");
+    expect(out).toContain("continue 1");
     expect((out.match(/<rect/g) ?? []).length).toBeGreaterThanOrEqual(8);
   });
 
   it("explains an empty range", async () => {
-    const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
+    const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, wouldActControlled: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
     answers["usage.get"] = { status: "ok", output: { from: NOW, to: NOW, token: null, totals: zero, sets: [], days: [] } };
     const { default: SavingsPage } = await import("./savings/page");
     expect(await html(SavingsPage({ searchParams: sp() }))).toContain("Nothing on the trail yet.");
   });
 
   it("filters by token, and says when a token made no runs in the range", async () => {
-    const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
+    const zero = { runs: 0, bandHigh: 0, bandMedium: 0, bandLow: 0, wouldActControlled: 0, errors: 0, inputTokens: 0, outputTokens: 0, systemOneCostMicroUsd: 0, counterfactualMicroUsd: 0, savingsMicroUsd: 0, llmCallsAvoided: 0 };
     answers["usage.get"] = { status: "ok", output: { from: NOW, to: NOW, token: "nick-hooks", totals: zero, sets: [], days: [] } };
     const { default: SavingsPage } = await import("./savings/page");
     const out = await html(SavingsPage({ searchParams: sp({ token: "nick-hooks" }) }));

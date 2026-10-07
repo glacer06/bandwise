@@ -82,7 +82,7 @@ Actor columns named `*_user_id` and `*_token_id` come in pairs. A person acting 
 
 #### `runs` (partitioned by month)
 
-`id (uuidv7), org_id, project_id, set_id, version_id, channel, rollout, experiment_id null, arm (champion|challenger) null, source (console|playground|api|embed|extension|mcp|eval|cli|ingest), app_id, actor_user_id, actor_token_id, key_mode, system_one_provider (typesafe|openrouter), parent_run_id uuid null, model_requested, model_resolved, typesafe_request_id, interface_major, external_ref null, state jsonb null, state_hash, stages jsonb, checks jsonb, answers jsonb, decisions jsonb, run_band, overall_action, route, warnings jsonb, input_tokens, output_tokens, system_one_cost_micro_usd null, system_one_calls, cf_input_tokens, cf_output_tokens, counterfactual_micro_usd, counterfactual_mode, comparator_model, savings_micro_usd, savings_kind, savings_suppressed null, escalation_cost_micro_usd, llm_calls_made, llm_calls_avoided, context_tokens_pruned, latency_ms, status (ok|error|rate_limited|quota_exceeded), error_code, created_at`.
+`id (uuidv7), org_id, project_id, set_id, version_id, channel, rollout, experiment_id null, arm (champion|challenger) null, source (console|playground|api|embed|extension|mcp|eval|cli|ingest), app_id, actor_user_id, actor_token_id, key_mode, system_one_provider (typesafe|openrouter), parent_run_id uuid null, model_requested, model_resolved, typesafe_request_id, interface_major, external_ref null, state jsonb null, state_hash, stages jsonb, checks jsonb, answers jsonb, decisions jsonb, run_band, overall_action, policy_action null, route, warnings jsonb, input_tokens, output_tokens, system_one_cost_micro_usd null, system_one_calls, cf_input_tokens, cf_output_tokens, counterfactual_micro_usd, counterfactual_mode, comparator_model, savings_micro_usd, savings_kind, savings_suppressed null, escalation_cost_micro_usd, llm_calls_made, llm_calls_avoided, context_tokens_pruned, latency_ms, status (ok|error|rate_limited|quota_exceeded), error_code, created_at`.
 
 - Indexes: `(org_id, set_id, created_at desc)`, `(org_id, source, created_at)`, `(org_id, external_ref)`, `(org_id, experiment_id)`, `(org_id, version_id)`. They are partitioned indexes, so every partition gets them, including ones `bandwise_ensure_runs_partition` makes later.
 - `rollout` is the rollout stage read from the channel pointer at run time. It is a record of what applied, not a setting.
@@ -117,6 +117,7 @@ Actor columns named `*_user_id` and `*_token_id` come in pairs. A person acting 
 | `decisions` | `decisions` |
 | `runBand` | `run_band` |
 | `overallAction` | `overall_action` |
+| `policyAction` | `policy_action` (null on rows before migration 0009) |
 | `route` | `route` |
 | `cost.systemOneInputTokens` | `input_tokens` |
 | `cost.systemOneOutputTokens` | `output_tokens` |

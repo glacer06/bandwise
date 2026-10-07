@@ -180,6 +180,8 @@ export interface RunSetTotals {
   bandHigh: number;
   bandMedium: number;
   bandLow: number;
+  /** Runs that would act in controlled: run band high and policy action auto (ADR-010 Amendment 1). */
+  wouldActControlled: number;
   errors: number;
   inputTokens: number;
   outputTokens: number;
@@ -187,6 +189,13 @@ export interface RunSetTotals {
   counterfactualMicroUsd: number;
   savingsMicroUsd: number;
   llmCallsAvoided: number;
+}
+
+/** usage.get: one set's would-act runs on one route (ADR-010 Amendment 1). `route` is null for runs with no route. */
+export interface RunWouldActRoute {
+  setId: string;
+  route: string | null;
+  runs: number;
 }
 
 /** One UTC day of org run totals for the usage.get chart. `day` is YYYY-MM-DD. */
@@ -435,6 +444,7 @@ export function buildRepositories(opts: RepoOptions) {
             bandHigh: n(sql`count(*) filter (where ${t.runBand} = 'high')`),
             bandMedium: n(sql`count(*) filter (where ${t.runBand} = 'medium')`),
             bandLow: n(sql`count(*) filter (where ${t.runBand} = 'low')`),
+            wouldActControlled: n(sql`count(*) filter (where ${t.runBand} = 'high' and ${t.policyAction} = 'auto')`),
             errors: n(sql`count(*) filter (where ${t.status} <> 'ok')`),
             inputTokens: n(sql`sum(${t.inputTokens})`),
             outputTokens: n(sql`sum(${t.outputTokens})`),
@@ -489,6 +499,30 @@ export function buildRepositories(opts: RepoOptions) {
           )
           .groupBy(day)
           .orderBy(asc(day));
+      },
+      /** usage.get: runs that would act in controlled, per set and route, over [from, to]. */
+      async wouldActByRoute(tx: TenantTx, range: RunTotalsRange): Promise<RunWouldActRoute[]> {
+        const t = s.runs;
+        if (range.setIds !== undefined && range.setIds.length === 0) return [];
+        if (range.actorTokenIds !== undefined && range.actorTokenIds.length === 0) return [];
+        return drizzleOf(tx)
+          .select({ setId: t.setId, route: t.route, runs: sql<number>`count(*)::bigint`.mapWith(Number) })
+          .from(t)
+          .where(
+            runs.scope(
+              tx,
+              and(
+                gte(t.createdAt, range.from),
+                lte(t.createdAt, range.to),
+                eq(t.runBand, "high"),
+                eq(t.policyAction, "auto"),
+                range.setIds === undefined ? undefined : inArray(t.setId, [...range.setIds]),
+                range.actorTokenIds === undefined ? undefined : inArray(t.actorTokenId, [...range.actorTokenIds]),
+              ),
+            ),
+          )
+          .groupBy(t.setId, t.route)
+          .orderBy(asc(t.setId), asc(t.route));
       },
       async listBySet(tx: TenantTx, setId: string, limit?: number) {
         return drizzleOf(tx)

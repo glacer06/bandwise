@@ -120,6 +120,7 @@
   },
   "runBand": "medium",
   "overallAction": "review",
+  "policyAction": "review",
   "route": "urgent",
   "cost": {
     "systemOneInputTokens": 318,

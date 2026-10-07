@@ -296,6 +296,8 @@ export const RunRecord = z.object({
   decisions: z.record(DecisionId, Decision),
   runBand: Band,
   overallAction: Action,
+  /** RunResult.policyAction. Null on rows written before ADR-010 Amendment 1. */
+  policyAction: Action.nullable(),
   route: z.string().nullable(),
   warnings: z.array(z.string()),
   /** System One tokens. */

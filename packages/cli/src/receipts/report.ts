@@ -12,8 +12,14 @@ export interface SetReport {
   failed: number;
   decisions: number;
   bands: Record<Band, number>;
-  /** Runs whose policy would have acted (overallAction auto and a route) if the set were live. */
+  /**
+   * Runs the set would act on in controlled: run band high and policy action auto (ADR-010
+   * Amendment 1). Receipts with no policy action, from older CLIs, keep the old rule: overall
+   * action auto and a route, which only a live stage can show.
+   */
   wouldAct: number;
+  /** The would-act runs by route, most first. `null` is a run with no route. */
+  wouldActRoutes: { route: string | null; runs: number }[];
   /** Runs where the hook changed the session. Zero in shadow. */
   acted: number;
   rollouts: string[];
@@ -50,6 +56,18 @@ const pct = (sorted: number[], p: number): number | null =>
 
 const round6 = (n: number): number => Math.round(n * 1e6) / 1e6;
 
+/** ADR-010 Amendment 1, with the old rule for receipts that carry no policy action. */
+export function wouldActInControlled(r: Receipt): boolean {
+  if (r.policyAction === undefined) return r.overallAction === "auto" && r.route !== null;
+  return r.runBand === "high" && r.policyAction === "auto";
+}
+
+function routeCounts(rs: readonly Receipt[]): { route: string | null; runs: number }[] {
+  const counts = new Map<string | null, number>();
+  for (const r of rs) counts.set(r.route, (counts.get(r.route) ?? 0) + 1);
+  return [...counts.entries()].map(([route, runs]) => ({ route, runs })).sort((a, b) => b.runs - a.runs || String(a.route).localeCompare(String(b.route)));
+}
+
 /** Build the report from receipts. `now` and `sinceMs` pick the window; `set` narrows it to one set. */
 export function buildReport(receipts: readonly Receipt[], opts: { now: number; sinceMs?: number | null; sinceText?: string | null; set?: string | null }): Report {
   const cutoff = opts.sinceMs === undefined || opts.sinceMs === null ? null : opts.now - opts.sinceMs;
@@ -78,7 +96,8 @@ export function buildReport(receipts: readonly Receipt[], opts: { now: number; s
         failed: rs.length - ok.length,
         decisions,
         bands,
-        wouldAct: ok.filter((r) => r.overallAction === "auto" && r.route !== null).length,
+        wouldAct: ok.filter(wouldActInControlled).length,
+        wouldActRoutes: routeCounts(ok.filter(wouldActInControlled)),
         acted: rs.filter((r) => r.acted).length,
         rollouts: [...new Set(rs.map((r) => r.rollout))].sort(),
         systemOneCostUsd: round6(s1),
@@ -107,6 +126,11 @@ export function buildReport(receipts: readonly Receipt[], opts: { now: number; s
 
 const usd = (n: number): string => `$${n.toFixed(6)}`;
 
+/** ` (continue 13, stop 13)`, or nothing when there is no would-act run. */
+export function routeSplit(routes: readonly { route: string | null; runs: number }[]): string {
+  return routes.length === 0 ? "" : ` (${routes.map((r) => `${r.route ?? "no route"} ${r.runs}`).join(", ")})`;
+}
+
 /** Plain text for a person. */
 export function formatReport(r: Report, path: string, skipped: number): string {
   const lines: string[] = [];
@@ -121,7 +145,7 @@ export function formatReport(r: Report, path: string, skipped: number): string {
     lines.push(`${s.set} (${s.rollouts.join(", ")})`);
     lines.push(`  runs ${s.runs}, failed ${s.failed}, decisions ${s.decisions}`);
     lines.push(`  bands high ${s.bands.high}, medium ${s.bands.medium}, low ${s.bands.low}`);
-    lines.push(`  would have acted ${s.wouldAct}, acted ${s.acted}`);
+    lines.push(`  would act in controlled ${s.wouldAct}${routeSplit(s.wouldActRoutes)}, acted ${s.acted}`);
     lines.push(`  System One spend ${usd(s.systemOneCostUsd)}${s.unpriced > 0 ? ` (${s.unpriced} unpriced)` : ""}`);
     lines.push(`  counterfactual LLM spend ${usd(s.counterfactualLlmCostUsd)} (estimate)`);
     lines.push(`  estimated savings ${usd(s.estimatedSavingsUsd)} (estimate)`);

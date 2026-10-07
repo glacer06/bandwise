@@ -349,6 +349,7 @@ export async function runQuestionSet(
   let decisions: Record<string, Decision> = {};
   let runBand: RunResult["runBand"] = "low";
   let overallAction: Action = "fallback";
+  let policyAction: Action = "fallback";
   let route: string | null = null;
   let escalationCostMicro = 0;
   let llmCallsMade = 0;
@@ -433,6 +434,7 @@ export async function runQuestionSet(
     const summary = summarizeDecisions(decisions, routed.meta);
     runBand = summary.runBand;
     overallAction = summary.overallAction;
+    policyAction = summary.policyAction;
     route = routed.route;
 
     // Savings count relevant questions whose effective action is auto. A shadow run counts what the
@@ -509,6 +511,7 @@ export async function runQuestionSet(
     decisions,
     runBand,
     overallAction,
+    policyAction,
     route,
     cost,
     warnings,

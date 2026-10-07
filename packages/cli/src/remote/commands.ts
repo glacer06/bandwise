@@ -7,6 +7,7 @@ import { basename } from "node:path";
 import type { CommandOutput } from "../main.js";
 import { type ApiClient, type ApiError, type ErrorDetail, path, unquoteEtag } from "./client.js";
 import { diffJson } from "./json-diff.js";
+import { routeSplit } from "../receipts/index.js";
 import { EXIT, formatApiError, preview } from "./format.js";
 
 export const CHANNELS = ["production", "staging"] as const;
@@ -195,6 +196,9 @@ export interface RemoteSetSummary {
   runs: number;
   errors: number;
   bands: { high: number; medium: number; low: number };
+  /** Runs that would act in controlled (ADR-010 Amendment 1). Null when the server does not send it. */
+  wouldAct: number | null;
+  wouldActRoutes: { route: string | null; runs: number }[];
   systemOneCostUsd: number;
   counterfactualUsd: number;
   savingsUsd: number;
@@ -211,6 +215,10 @@ export function summarizeUsageRow(name: string, row: Record<string, unknown>): R
     runs: num(row["runs"]),
     errors: num(row["errors"]),
     bands: { high: num(row["bandHigh"]), medium: num(row["bandMedium"]), low: num(row["bandLow"]) },
+    wouldAct: typeof row["wouldActControlled"] === "number" ? row["wouldActControlled"] : null,
+    wouldActRoutes: (Array.isArray(row["wouldActRoutes"]) ? row["wouldActRoutes"] : [])
+      .filter(isObj)
+      .map((r) => ({ route: typeof r["route"] === "string" ? r["route"] : null, runs: num(r["runs"]) })),
     systemOneCostUsd: usd(row["systemOneCostMicroUsd"]),
     counterfactualUsd: usd(row["counterfactualMicroUsd"]),
     savingsUsd: usd(row["savingsMicroUsd"]),
@@ -222,7 +230,8 @@ function summaryLine(s: RemoteSetSummary): string {
   return (
     `${s.set}: ${s.runs} run${s.runs === 1 ? "" : "s"} (${s.errors} error${s.errors === 1 ? "" : "s"}), ` +
     `bands high ${s.bands.high} / medium ${s.bands.medium} / low ${s.bands.low}, ` +
-    `System One $${s.systemOneCostUsd.toFixed(6)}, estimated savings $${s.savingsUsd.toFixed(6)}, LLM calls avoided ${s.llmCallsAvoided}`
+    (s.wouldAct === null ? "" : `would act in controlled ${s.wouldAct}${routeSplit(s.wouldActRoutes)}, `) +
+    `System One $${s.systemOneCostUsd.toFixed(6)}, LLM estimate $${s.counterfactualUsd.toFixed(6)}, estimated savings $${s.savingsUsd.toFixed(6)}, LLM calls avoided ${s.llmCallsAvoided}`
   );
 }
 

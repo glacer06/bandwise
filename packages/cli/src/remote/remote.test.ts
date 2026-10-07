@@ -384,7 +384,14 @@ describe("remote commands", () => {
     const text = await main(["report", "--remote"], { env: ENV, fetch: api.fetch });
     expect(api.seen.at(-1)?.query).toEqual({});
     expect(text.stdout).toContain("2026-09-30 to 2026-10-01");
-    expect(text.stdout).toContain("done-check: 2 runs (1 error), bands high 1 / medium 0 / low 1, System One $0.000120, estimated savings $0.002000, LLM calls avoided 1");
+    expect(text.stdout).toContain(
+      "done-check: 2 runs (1 error), bands high 1 / medium 0 / low 1, would act in controlled 1 (continue 1), System One $0.000120, LLM estimate $0.002120, estimated savings $0.002000, LLM calls avoided 1",
+    );
+    expect(text.stdout).toContain("model-tier: 1 run (0 errors), bands high 0 / medium 1 / low 0, would act in controlled 0, System One");
+    // An older server sends no would-act count; the line leaves it out instead of printing 0.
+    const { wouldActControlled: _drop, wouldActRoutes: _routes, ...older } = USAGE_REPLY.sets[1] as (typeof USAGE_REPLY.sets)[1];
+    const old = fakeApi({ "GET /usage": { status: 200, body: { ...USAGE_REPLY, sets: [older] } } });
+    expect((await main(["report", "--remote"], { env: ENV, fetch: old.fetch })).stdout).not.toContain("would act");
     expect(text.stdout).toContain("total: 3 runs");
   });
 
