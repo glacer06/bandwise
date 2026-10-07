@@ -242,7 +242,7 @@ describe("jobs, previews and MCP tools", () => {
   });
 });
 
-/** The operations D2c and D3 serve (ADR-020). Every other handler is still a stub. */
+/** The operations D2c and D3 serve (ADR-020), plus agent_token.list for the runs token filter. Every other handler is still a stub. */
 const IMPLEMENTED: OperationId[] = [
   "set.list",
   "set.get",
@@ -268,6 +268,7 @@ const IMPLEMENTED: OperationId[] = [
   "review.resolve",
   "review.dismiss",
   "review.confirm",
+  "agent_token.list",
 ];
 
 describe("stubbed handlers", () => {

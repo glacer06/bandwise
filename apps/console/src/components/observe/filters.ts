@@ -44,6 +44,12 @@ export function rangeStart(range: RangeValue, now: Date): Date | undefined {
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,127}$/i;
 const CURSOR = /^[0-9a-f-]{36}$/i;
 
+/** The "Made by" filter: an agent token name, as agent_token.list returns it. */
+export function tokenParam(sp: SearchParams): string | undefined {
+  const token = param(sp, "token");
+  return token !== undefined && token.length <= 200 ? token : undefined;
+}
+
 /** run.list input from the runs page URL. */
 export function runListInput(sp: SearchParams, now: Date) {
   const input: Record<string, string> = { limit: "50" };
@@ -59,6 +65,8 @@ export function runListInput(sp: SearchParams, now: Date) {
   if (band !== undefined) input["band"] = band;
   const action = pick(Action, param(sp, "action"));
   if (action !== undefined) input["action"] = action;
+  const token = tokenParam(sp);
+  if (token !== undefined) input["token"] = token;
   const from = rangeStart(rangeOf(sp, "7d"), now);
   if (from !== undefined) input["from"] = from.toISOString();
   const cursor = param(sp, "cursor");

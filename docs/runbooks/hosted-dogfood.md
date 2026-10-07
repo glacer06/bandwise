@@ -219,6 +219,8 @@ bwa report --remote --since 1h
 
 `done-check` should show one run. Then start a new Claude Code session in this repo, send one prompt, and run `pnpm bandwise report --since 1h` (local receipts, now marked `provider: bandwise`) and `bwa report --remote --since 1h` (server runs). Both should show `model-tier`.
 
+Runs from `nick-hooks` (this Mac) and `sims-hooks` (cloud sessions on another repo) land in the same sets. `bwa report --remote --since 1h --made-by nick-hooks` counts only one of them, and the "Made by" column and filter on `/runs` and `/savings` show which token made each run. A name covers every token with that name, so a rotated token keeps its history.
+
 The remote report books no savings for shadow runs (`savingsSuppressed`), while the local report prices its own estimate, so the two savings columns differ by design. `--since` is an exact timestamp on the server; the header prints dates only.
 
 Done 2026-10-05: `status: ok`, version 1, `shadow`, `jev-1.13.0`, and both reports showed all three hook sets. Two calls about 22:17 UTC returned a 503 with no outgoing request and recovered on their own; that is tracked separately.

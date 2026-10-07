@@ -25,6 +25,9 @@ import { defineOperation, operationGroup, placeholderInput, placeholderOutput } 
 import { ModelName, SetRef, VersionNumber, listInput, listOutput } from "./schemas";
 import { RunDetail, RunSummary, UsageView } from "./views";
 
+/** An agent token id or name, for the run.list and usage.get token filter. */
+const TokenRef = z.string().min(1).max(200);
+
 export const runOperations = operationGroup(
   defineOperation("set.run", {
     summary: "Run a question set and return the standard RunResult envelope.",
@@ -62,6 +65,8 @@ export const runOperations = operationGroup(
       band: Band.optional(),
       /** The overall action. */
       action: Action.optional(),
+      /** Runs made by this agent token: its id, or its name (every token with that name). */
+      token: TokenRef.optional(),
       from: IsoTimestamp.optional(),
       to: IsoTimestamp.optional(),
     }),
@@ -78,7 +83,13 @@ export const runOperations = operationGroup(
 
   defineOperation("usage.get", {
     summary: "Read run, spend and savings totals per set over a time range (default: the last 7 days).",
-    input: z.strictObject({ from: IsoTimestamp.optional(), to: IsoTimestamp.optional(), set: SetRef.optional() }),
+    input: z.strictObject({
+      from: IsoTimestamp.optional(),
+      to: IsoTimestamp.optional(),
+      set: SetRef.optional(),
+      /** Only runs made by this agent token: its id, or its name. */
+      token: TokenRef.optional(),
+    }),
     output: UsageView,
     handler: getUsage,
   }),

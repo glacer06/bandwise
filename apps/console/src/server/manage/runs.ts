@@ -2,7 +2,7 @@
 // without state except in run.get, and only for sets the caller's allowlist admits.
 
 import type { Action, Band, Channel, RunRecordSource, RunStatus } from "@bandwise/core";
-import { repos, type RunPageFilter, type RunSetTotals } from "@bandwise/db";
+import { repos, type RunPageFilter, type RunSetTotals, type RunTotalsRange } from "@bandwise/db";
 
 import type { OperationEnv } from "../operations/define";
 import { OperationError } from "../operations/errors";
@@ -15,7 +15,9 @@ export const DEFAULT_USAGE_DAYS = 7;
 
 type RunRow = Awaited<ReturnType<typeof repos.runs.listPage>>["data"][number];
 
-function summary(r: RunRow): RunSummary {
+type TokenNames = ReadonlyMap<string, string>;
+
+function summary(r: RunRow, names: TokenNames): RunSummary {
   return {
     id: r.id,
     setId: r.setId,
@@ -36,6 +38,8 @@ function summary(r: RunRow): RunSummary {
     counterfactualMicroUsd: r.counterfactualMicroUsd,
     savingsMicroUsd: r.savingsMicroUsd,
     errorCode: r.errorCode,
+    actorTokenId: r.actorTokenId,
+    actorTokenName: r.actorTokenId === null ? null : (names.get(r.actorTokenId) ?? null),
     createdAt: iso(r.createdAt),
   };
 }
@@ -45,6 +49,27 @@ export async function visibleSetId(env: OperationEnv, ref: string): Promise<stri
   const set = await findSet(env.tx, ref);
   if (!inAllowlist(env.ctx, set.id)) throw new OperationError("not_found", setNotFound(ref));
   return set.id;
+}
+
+/**
+ * The names of the agent tokens that made these runs, read in the caller's tenant transaction, so
+ * RLS and the org filter both apply. Only the id and the name leave this function.
+ */
+async function tokenNames(env: OperationEnv, rows: readonly { actorTokenId: string | null }[]): Promise<TokenNames> {
+  const ids = [...new Set(rows.flatMap((r) => (r.actorTokenId === null ? [] : [r.actorTokenId])))];
+  const found = await repos.agentTokens.namesByIds(env.tx, ids);
+  return new Map(found.map((t) => [t.id, t.name]));
+}
+
+/**
+ * The token filter: an agent token id, or a name, which matches every token in the caller's org
+ * with that name (revoked ones too, so a rotated token keeps its history). 404 when none matches.
+ */
+export async function tokenFilter(env: OperationEnv, ref: string): Promise<{ name: string; ids: string[] }> {
+  const found = isUuid(ref) ? await repos.agentTokens.namesByIds(env.tx, [ref]) : await repos.agentTokens.listByName(env.tx, ref);
+  const first = found[0];
+  if (first === undefined) throw new OperationError("not_found", `No agent token ${ref} in this org.`);
+  return { name: first.name, ids: found.map((t) => t.id) };
 }
 
 const date = (v: string | undefined): Date | undefined => (v === undefined ? undefined : new Date(v));
@@ -59,6 +84,7 @@ export async function listRuns(
     status?: RunStatus | undefined;
     band?: Band | undefined;
     action?: Action | undefined;
+    token?: string | undefined;
     from?: string | undefined;
     to?: string | undefined;
     limit: number;
@@ -81,12 +107,14 @@ export async function listRuns(
   if (input.status !== undefined) filter.status = input.status;
   if (input.band !== undefined) filter.band = input.band;
   if (input.action !== undefined) filter.action = input.action;
+  if (input.token !== undefined) filter.actorTokenIds = (await tokenFilter(env, input.token)).ids;
   const from = date(input.from);
   const to = date(input.to);
   if (from !== undefined) filter.from = from;
   if (to !== undefined) filter.to = to;
   const page = await repos.runs.listPage(env.tx, filter, { limit: input.limit, cursor: cursorOf(input.cursor, "uuid") });
-  return { data: page.data.map(summary), nextCursor: page.nextCursor };
+  const names = await tokenNames(env, page.data);
+  return { data: page.data.map((r) => summary(r, names)), nextCursor: page.nextCursor };
 }
 
 export async function getRun(env: OperationEnv, input: { id: string }): Promise<RunDetail> {
@@ -98,8 +126,9 @@ export async function getRun(env: OperationEnv, input: { id: string }): Promise<
   }
   env.authorize({ setId: run.setId }, undefined, notFound);
   const items = await repos.reviewItems.listByRun(env.tx, run.id);
+  const names = await tokenNames(env, [run]);
   return {
-    ...summary(run),
+    ...summary(run, names),
     stages: run.stages,
     checks: run.checks,
     answers: (run.answers ?? null) as RunDetail["answers"],
@@ -137,14 +166,18 @@ const ZERO: Omit<RunSetTotals, "setId"> = {
  * usage.get reads the runs table directly. The usage_daily rollup and the savings ledger land with
  * the jobs runner (Phase 2); the numbers are the same sums.
  */
-export async function getUsage(env: OperationEnv, input: { from?: string | undefined; to?: string | undefined; set?: string | undefined }): Promise<UsageView> {
+export async function getUsage(
+  env: OperationEnv,
+  input: { from?: string | undefined; to?: string | undefined; set?: string | undefined; token?: string | undefined },
+): Promise<UsageView> {
   env.authorize({});
   const to = date(input.to) ?? env.now;
   const from = date(input.from) ?? new Date(to.getTime() - DEFAULT_USAGE_DAYS * 86_400_000);
   if (from.getTime() > to.getTime()) throw new OperationError("invalid_request", "from is after to.");
   let setIds = allowlistOf(env.ctx);
   if (input.set !== undefined) setIds = [await visibleSetId(env, input.set)];
-  const range = { from, to, ...(setIds === undefined ? {} : { setIds }) };
+  const token = input.token === undefined ? null : await tokenFilter(env, input.token);
+  const range: RunTotalsRange = { from, to, ...(setIds === undefined ? {} : { setIds }), ...(token === null ? {} : { actorTokenIds: token.ids }) };
   const rows = await repos.runs.totalsBySet(env.tx, range);
   const days = await repos.runs.totalsByDay(env.tx, range);
   const totals = { ...ZERO };
@@ -154,5 +187,5 @@ export async function getUsage(env: OperationEnv, input: { from?: string | undef
     sets.push({ ...row, slug: set?.slug ?? row.setId });
     for (const k of Object.keys(ZERO) as (keyof typeof ZERO)[]) totals[k] += row[k];
   }
-  return { from: iso(from), to: iso(to), sets, totals, days };
+  return { from: iso(from), to: iso(to), token: token?.name ?? null, sets, totals, days };
 }

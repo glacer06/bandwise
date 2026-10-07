@@ -284,6 +284,16 @@
             }
           },
           {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
             "name": "from",
             "in": "query",
             "required": false,
@@ -461,6 +471,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
             }
           }
         ],
@@ -7857,7 +7877,7 @@
     "/api/v1/agent-tokens": {
       "get": {
         "operationId": "agent_token.list",
-        "summary": "List agent tokens.",
+        "summary": "List agent tokens: id, name, client, owner, scopes and dates. Never the hash or the prefix.",
         "tags": [
           "agent_token"
         ],
@@ -7885,7 +7905,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Shape lands in Phase 2.",
+            "description": "OK.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7923,11 +7943,7 @@
         "x-bandwise-phase": "2",
         "x-bandwise-async": false,
         "x-bandwise-destructive": false,
-        "x-bandwise-emits": [],
-        "x-bandwise-placeholder": {
-          "input": false,
-          "output": true
-        }
+        "x-bandwise-emits": []
       },
       "post": {
         "operationId": "agent_token.create",
@@ -10081,7 +10097,89 @@
         "properties": {
           "data": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "client": {
+                  "type": "string",
+                  "enum": [
+                    "cli",
+                    "mcp",
+                    "extension",
+                    "console"
+                  ]
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "roleCeiling": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "admin",
+                    "editor",
+                    "reviewer",
+                    "viewer"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "revokedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "client",
+                "userId",
+                "roleCeiling",
+                "scopes",
+                "expiresAt",
+                "revokedAt",
+                "lastUsedAt",
+                "createdAt"
+              ]
+            }
           },
           "nextCursor": {
             "type": [
@@ -19571,6 +19669,23 @@
               "null"
             ]
           },
+          "actorTokenId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actorTokenName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -19792,6 +19907,8 @@
           "counterfactualMicroUsd",
           "savingsMicroUsd",
           "errorCode",
+          "actorTokenId",
+          "actorTokenName",
           "createdAt",
           "stages",
           "checks",
@@ -19992,6 +20109,23 @@
                     "null"
                   ]
                 },
+                "actorTokenId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actorTokenName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "createdAt": {
                   "type": "string",
                   "format": "date-time"
@@ -20017,6 +20151,8 @@
                 "counterfactualMicroUsd",
                 "savingsMicroUsd",
                 "errorCode",
+                "actorTokenId",
+                "actorTokenName",
                 "createdAt"
               ]
             }
@@ -21933,6 +22069,12 @@
             "type": "string",
             "format": "date-time"
           },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "sets": {
             "type": "array",
             "items": {
@@ -22146,6 +22288,7 @@
         "required": [
           "from",
           "to",
+          "token",
           "sets",
           "totals",
           "days"

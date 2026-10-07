@@ -118,7 +118,7 @@ bandwise spec diff <file> [--set <slug>] [--version <n>] [--json]
 bandwise publish <set> [--channel production|staging] [--changelog <text>] [--if-match <etag>] [--json]
 bandwise rollback <set> [--channel production|staging] [--to <n>] [--json]
 bandwise rollout <set> <inactive|shadow|controlled|full|paused> [--channel production|staging] [--reason <text>] [--json]
-bandwise report --remote [--since 7d] [--set <slug>] [--json]
+bandwise report --remote [--since 7d] [--set <slug>] [--made-by <token name>] [--json]
 ```
 
 | Command | What it does |
@@ -129,7 +129,7 @@ bandwise report --remote [--since 7d] [--set <slug>] [--json]
 | `publish` | Publishes the draft as the next version on a channel (default `production`). |
 | `rollback` | Points a channel back at the version it served before, or at an earlier version it served with `--to`. Never waits for an approval. To move forward, publish. |
 | `rollout` | Sets a channel's rollout stage, with `--reason` recorded in the audit log. |
-| `report --remote` | Runs per set from the server for `--since` (default the last 7 days) and `--set`: the band mix, errors, System One cost, estimated savings and LLM calls avoided. |
+| `report --remote` | Runs per set from the server for `--since` (default the last 7 days) and `--set`: the band mix, errors, System One cost, estimated savings and LLM calls avoided. `--made-by` counts only the runs one agent token made, by its name or id, and `--json` then names it as `madeBy` on each set row. |
 
 When a person must approve a change, `publish`, `rollback` and `rollout` print the approval id and the console link, and exit `3`. A failed gate prints each gate with what it needs and what it measured. Errors print one line with the code, the HTTP status, the message and the request id, then each detail, then what to do next. For example, a draft that changed since you read it:
 

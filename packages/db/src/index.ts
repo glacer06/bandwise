@@ -15,7 +15,9 @@ export {
   type Repositories,
   type ReviewPageFilter,
   type RunDayTotals,
+  type AgentTokenName,
   type RunPageFilter,
+  type RunTotalsRange,
   type RunSetTotals,
 } from "./repos/index.js";
 export {

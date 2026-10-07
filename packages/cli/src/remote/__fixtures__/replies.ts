@@ -20,6 +20,7 @@ const totals = (runs: number, high: number, medium: number, low: number, errors:
 export const USAGE_REPLY = {
   from: "2026-09-30T00:00:00.000Z",
   to: "2026-10-01T00:00:00.000Z",
+  token: null,
   sets: [
     { setId: "6b0f8c1e-2a4d-4f6e-9a1b-3c5d7e9f1a2b", slug: "model-tier", ...totals(1, 0, 1, 0, 0, 50, 0) },
     { setId: "0d4e2f6a-8b1c-4d3e-a5f7-9b1c3d5e7f9a", slug: "done-check", ...totals(2, 1, 0, 1, 1, 120, 2_000) },

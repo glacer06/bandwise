@@ -25,7 +25,7 @@ export const USAGE = `Usage:
                      [--rollout shadow|controlled|full|paused] [--channel production|staging]
   bandwise run --live <spec.json> <state.json> [same options] [--receipts[=<path>]]
   bandwise report [--since 7d] [--set <slug>] [--receipts <path>] [--compare profile] [--json]
-  bandwise report --remote [--since 7d] [--set <slug>] [--json]
+  bandwise report --remote [--since 7d] [--set <slug>] [--made-by <token name>] [--json]
   bandwise hook <Stop|PreToolUse|UserPromptSubmit> --set <spec.json> [--rollout shadow|controlled|full]
                      [--provider typesafe|openrouter|vercel] [--timeout-ms 3000] [--receipts <path>] [--drop <field>]
                      [--remote-set <slug>]
@@ -77,7 +77,8 @@ and never a provider key. The token is sent only as a bearer header and is never
             publish, rollback and rollout exit 3 when a person must approve, and print the
             approval id and the console link.
   report --remote
-            Runs, spend and estimated savings per set from the server (usage.get).
+            Runs, spend and estimated savings per set from the server (usage.get). --made-by
+            limits the totals to the runs one agent token made, by its name or id.
   hook      With BANDWISE_TOKEN set, a hook calls POST /api/v1/sets/<slug>/run, where <slug> is
             the --set file name or --remote-set. The local spec still decides which fields are
             sent. The server's rollout stage for the set decides whether the hook may act, so
@@ -206,7 +207,7 @@ export function parseArgs(argv: readonly string[]): Parsed {
   if (command === "run") return parseRun(rest);
 
   if (command === "report") {
-    const f = flags(rest, ["--since", "--set", "--receipts", "--compare"], ["--json", "--remote"]);
+    const f = flags(rest, ["--since", "--set", "--receipts", "--compare", "--made-by"], ["--json", "--remote"]);
     if (typeof f === "string") return err(f);
     const since = f["--since"]?.[0];
     const sinceMs = since === undefined ? null : parseSince(since);
@@ -217,8 +218,11 @@ export function parseArgs(argv: readonly string[]): Parsed {
       if (since !== undefined && sinceMs !== null) remote.since = { text: since, ms: sinceMs };
       const set = f["--set"]?.[0];
       if (set !== undefined) remote.set = set;
+      const madeBy = f["--made-by"]?.[0];
+      if (madeBy !== undefined) remote.madeBy = madeBy;
       return remote;
     }
+    if (f["--made-by"] !== undefined) return err("--made-by filters runs on the server, so it needs --remote");
     const out: Extract<Parsed, { kind: "report" }> = { kind: "report", json: f["--json"] !== undefined };
     if (since !== undefined) out.since = since;
     const set = f["--set"]?.[0];
