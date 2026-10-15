@@ -266,6 +266,29 @@ describe("hook input mapping", () => {
     expect(mapHookInput("UserPromptSubmit", { prompt: wake }, () => "")).toEqual({ kind: "skip" });
   });
 
+  it("skips a compaction summary: it recaps old tasks and is not a request", () => {
+    const line = (x: unknown): string => JSON.stringify(x);
+    const wake = "<task-notification>\n<task-type>queued-remote-notifications</task-type>\n<status>pending</status>\n</task-notification>";
+    const summary = "This session is being continued from a previous conversation that ran out of context.\n\nSummary:\n1. Primary Request: ship the release, email the reviewer, fix the docs.";
+    const typed = line({ type: "user", timestamp: "2026-10-15T17:00:00.000Z", message: { content: "merge the PR once CI is green" } });
+    const afterCompaction = [
+      line({ type: "system", subtype: "compact_boundary", content: "Conversation compacted" }),
+      line({ type: "user", isCompactSummary: true, isVisibleInTranscriptOnly: true, timestamp: "2026-10-15T17:30:00.000Z", message: { content: summary } }),
+      line({ type: "user", timestamp: "2026-10-15T17:40:00.000Z", message: { content: wake } }),
+      line({ type: "assistant", message: { id: "m2", content: [{ type: "text", text: "CI is still running. Waiting." }] } }),
+    ];
+    const t = [typed, line({ type: "assistant", message: { id: "m1", content: [{ type: "text", text: "Watching CI." }] } }), ...afterCompaction].join("\n");
+    expect(lastExchange(t)).toEqual({ request: "merge the PR once CI is green", lastReply: "CI is still running. Waiting." });
+    expect(taskStats(t)?.requestAt).toBe(Date.parse("2026-10-15T17:00:00.000Z"));
+    // A summary line without the flags is still known by its opening text.
+    const unflagged = t.replace('"isCompactSummary":true,"isVisibleInTranscriptOnly":true,', "");
+    expect(unflagged).not.toContain("isCompactSummary");
+    expect(lastExchange(unflagged).request).toBe("merge the PR once CI is green");
+    // With no typed request left in the tail, the Stop has no request and is skipped.
+    expect(lastExchange(afterCompaction.join("\n"))).toEqual({ request: undefined, lastReply: "CI is still running. Waiting." });
+    expect(mapHookInput("Stop", { transcript_path: "/t.jsonl" }, () => afterCompaction.join("\n"))).toEqual({ kind: "skip" });
+  });
+
   it("knows a harness envelope only by its opening tag", () => {
     expect(isHarnessEnvelope("<task-notification>\n...")).toBe(true);
     expect(isHarnessEnvelope('  <wake reason="external-event">')).toBe(true);
@@ -274,6 +297,9 @@ describe("hook input mapping", () => {
     expect(isHarnessEnvelope("<wakeful> is not a tag we write")).toBe(false);
     expect(isHarnessEnvelope("Fix the <task-notification> parser")).toBe(false);
     expect(isHarnessEnvelope("<system-reminder>")).toBe(false);
+    expect(isHarnessEnvelope("This session is being continued from a previous conversation that ran out of context.")).toBe(true);
+    expect(isHarnessEnvelope("<artifact-content-authored-by-others/>\nThe summarized conversation included")).toBe(true);
+    expect(isHarnessEnvelope("Summarize this session for me")).toBe(false);
   });
 
   it("reads a launch profile only when it looks like a profile id", () => {

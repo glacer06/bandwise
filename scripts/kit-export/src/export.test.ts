@@ -168,4 +168,21 @@ describe("the bandwise-gate plugin", () => {
       expect(new Set(pins), rel).toEqual(new Set([KIT_VERSION]));
     }
   });
+
+  // Without BANDWISE_TOKEN the CLI falls back to local live mode, which calls System One on any
+  // provider key it finds. The plugin is hosted only, so each hook clears those keys first.
+  it("runs every hook hosted only, with the provider keys cleared", () => {
+    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, "plugins/claude-code/hooks/hooks.json"), "utf8")) as {
+      hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+    };
+    const commands = Object.values(hooks.hooks).flatMap((groups) => groups.flatMap((g) => g.hooks.map((h) => h.command)));
+    expect(commands.length).toBeGreaterThan(0);
+    for (const command of commands) {
+      const npx = command.indexOf("npx ");
+      expect(npx, command).toBeGreaterThan(0);
+      for (const key of ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY", "AI_GATEWAY_API_KEY"]) {
+        expect(command.slice(0, npx), `${key} in ${command}`).toMatch(new RegExp(`(?:^|\\s)${key}= `));
+      }
+    }
+  });
 });

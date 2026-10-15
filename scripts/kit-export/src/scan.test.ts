@@ -26,6 +26,10 @@ describe("scanText", () => {
     ["the bandwise-builder skill", "ref.internal-skill"],
     ["(spec-schema.md section 2)", "ref.internal-doc"],
     ["references/api.md", "ref.internal-doc"],
+    ["// docs/PLAN.md Open items", "ref.internal-doc"],
+    ["see `docs/adr-notes/PLAN.md`", "ref.internal-doc"],
+    ["password failed for user bandwise_console", "db.internal-role"],
+    ["GRANT bandwise_app TO x", "db.internal-role"],
     ["mail ops@company.com", "secret.email"],
     ["sk_live_0123456789abcdef", "secret.bandwise-token"],
     ["sa_live_abcdefgh1234", "secret.bandwise-token"],
@@ -54,12 +58,15 @@ describe("scanText", () => {
     "import { z } from \"zod\"; // @bandwise/core",
     "TYPESAFE_API_KEY is read from your env",
     "SECURITY.md and CONTRIBUTING.md",
+    "https://github.com/acme/repo/blob/main/docs/api.md",
+    "password hunter2 for user app_user",
   ])("allows %j", (text) => {
     expect(rules(text)).toEqual([]);
   });
 
   it("uses extra internal doc names", () => {
     expect(rules("see team-notes.md", ["team-notes.md"])).toEqual(["ref.internal-doc"]);
+    expect(rules("see `docs/runbooks/dogfood.md` section 3.", ["dogfood.md"])).toEqual(["ref.internal-doc"]);
     expect(rules("see team-notes.md")).toEqual([]);
   });
 

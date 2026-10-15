@@ -72,8 +72,8 @@ const ROW_1_14_0: ModelProfileInput = {
     statePlusLongestQuestionTokens: 32_000,
     // models.md now sets rate limits per organization, in tokens and requests per second, and no
     // longer publishes them per model. These repeat jev-1.13.0's last published values because the
-    // contract needs positive integers. How to store them waits on an ADR-008 amendment, listed in
-    // docs/PLAN.md Open items and not yet written.
+    // contract needs positive integers. How to store per-organization limits is not settled yet
+    // (ADR-008).
     rpm: 1_200,
     tokensPerSec: 250_000,
   },

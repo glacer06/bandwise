@@ -71,6 +71,12 @@ interface Patch {
 /** Exact edits to single kit files. Each must match exactly once, so drift fails the export. */
 const PATCHES: readonly Patch[] = [
   {
+    file: ".bandwise/README.md",
+    find: "; see `docs/runbooks/dogfood.md` section 3.",
+    replace: ".",
+    why: "the hosted-mode runbook is internal and not in the kit",
+  },
+  {
     file: "packages/cli/src/local/main.test.ts",
     find: 'at("../examples/email-triage.state.json")',
     replace: 'at("../../../examples/email-triage.state.json")',

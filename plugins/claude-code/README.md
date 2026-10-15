@@ -31,7 +31,7 @@ The hooks and the MCP server read separate variables, so the hooks never run wit
 
 Load both from your password manager or keychain in your shell profile. Never put a token in a file in a repository, and never paste it into a prompt.
 
-Without `BANDWISE_TOKEN` the hooks end silently and change nothing. Without `BANDWISE_MCP_TOKEN` the MCP server is refused and shows no tools.
+Without `BANDWISE_TOKEN` the hooks end silently and change nothing. The hook commands clear `TYPESAFE_API_KEY`, `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY` for their own process, so a provider key in your shell never makes them call System One on that key. Without `BANDWISE_MCP_TOKEN` the MCP server is refused and shows no tools.
 
 ## What leaves your machine
 

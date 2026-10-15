@@ -272,7 +272,7 @@ export const RunResultObject = z.object({
   /**
    * The most conservative policy action of the same decisions, before the rollout stage applies
    * (ADR-010 Amendment 1). Equals overallAction in full. A run would act in controlled when runBand
-   * is high and this is auto. Null only on runs recorded before the amendment.
+   * is high and this is auto. Null only on runs recorded before policyAction existed.
    */
   policyAction: Action.nullable(),
   route: z.string().nullable(),

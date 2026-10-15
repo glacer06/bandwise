@@ -1,12 +1,12 @@
 {
-  "description": "Bandwise Gate: done-check on Stop and action-risk-gate on PreToolUse, through hosted Bandwise. Without BANDWISE_TOKEN each hook ends silently.",
+  "description": "Bandwise Gate: done-check on Stop and action-risk-gate on PreToolUse, through hosted Bandwise only. Each command clears the System One provider keys for its own process, so without BANDWISE_TOKEN each hook ends silently and never calls a provider on a key from your shell.",
   "hooks": {
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && npx -y @bandwise/cli@0.4.0 hook Stop --set \"${CLAUDE_PLUGIN_ROOT}/sets/done-check.json\"",
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && TYPESAFE_API_KEY= OPENROUTER_API_KEY= AI_GATEWAY_API_KEY= npx -y @bandwise/cli@0.4.0 hook Stop --set \"${CLAUDE_PLUGIN_ROOT}/sets/done-check.json\"",
             "timeout": 10
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && npx -y @bandwise/cli@0.4.0 hook PreToolUse --set \"${CLAUDE_PLUGIN_ROOT}/sets/action-risk-gate.json\" --drop content_preview",
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && TYPESAFE_API_KEY= OPENROUTER_API_KEY= AI_GATEWAY_API_KEY= npx -y @bandwise/cli@0.4.0 hook PreToolUse --set \"${CLAUDE_PLUGIN_ROOT}/sets/action-risk-gate.json\" --drop content_preview",
             "timeout": 10
           }
         ]

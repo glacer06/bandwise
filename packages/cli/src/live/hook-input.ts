@@ -66,8 +66,21 @@ function textOf(content: unknown): string {
  */
 const HARNESS_ENVELOPE = /^<(?:task-notification|wake|webhook-payload|child-session-event)[\s>]/;
 
+/**
+ * The summary Claude Code writes when it compacts a long session. It is a user turn too, and it
+ * recaps every earlier task, so read as the request it makes a correct "still waiting on CI" reply
+ * look like work left. Transcript lines mark it (harnessEntry); the opening text is the fallback.
+ */
+const COMPACTION_SUMMARY = /^(?:This session is being continued from a previous conversation\b|<artifact-content-authored-by-others\/>)/;
+
 export function isHarnessEnvelope(text: string): boolean {
-  return HARNESS_ENVELOPE.test(text.trimStart());
+  const t = text.trimStart();
+  return HARNESS_ENVELOPE.test(t) || COMPACTION_SUMMARY.test(t);
+}
+
+/** Transcript lines that are not the conversation: meta lines, subagent lines and compaction summaries. */
+function harnessEntry(entry: Record<string, unknown>): boolean {
+  return entry["isMeta"] === true || entry["isSidechain"] === true || entry["isCompactSummary"] === true || entry["isVisibleInTranscriptOnly"] === true;
 }
 
 /**
@@ -85,7 +98,7 @@ export function lastExchange(transcript: string): { request: string | undefined;
     } catch {
       continue; // The first line of a tail read is usually cut.
     }
-    if (!isObj(entry) || !isObj(entry["message"]) || entry["isMeta"] === true || entry["isSidechain"] === true) continue;
+    if (!isObj(entry) || !isObj(entry["message"]) || harnessEntry(entry)) continue;
     const text = textOf(entry["message"]["content"]).trim();
     if (text === "") continue;
     if (entry["type"] === "user") {
@@ -125,7 +138,7 @@ export function taskStats(transcript: string): TaskStats | null {
     } catch {
       continue;
     }
-    if (!isObj(entry) || !isObj(entry["message"]) || entry["isMeta"] === true || entry["isSidechain"] === true) continue;
+    if (!isObj(entry) || !isObj(entry["message"]) || harnessEntry(entry)) continue;
     const content = entry["message"]["content"];
     if (entry["type"] === "user") {
       const text = textOf(content).trim();

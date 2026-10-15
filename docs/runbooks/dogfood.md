@@ -48,7 +48,15 @@ Read from the `runs` table for the `internal` org on 2026-10-15: 3,717 runs, no 
 - `model-tier`: 136 runs. Only 4 would act in `controlled`, all `hard`. 122 sit at `mechanical` in the medium band, so moving the set to `controlled` now would change about one prompt in 34. It waits for labeled prompts and a threshold check on that question (D5, labeled datasets) before it moves.
 - `done-check`: 222 runs, all through the `sims-hooks` token. In 150 of them the request is a cloud session's `<task-notification>` wake-up, and 61 of the 76 Stops it would block are among them. Those runs came from `@bandwise/cli@0.3.0`, which the `bandwise-gate` plugin pinned. It was published on 2026-10-02, four days before the envelope skip (`isHarnessEnvelope`) merged, so the skip never reached the plugin. The hosted `done-check` also still serves version 1 of 2026-10-05, from before the `waiting_on_event` outcome.
 
-The fix is kit 0.4.0 with the plugin pinned to it, then the current `.bandwise/sets/done-check.json` published as a new hosted version at `shadow` (the commands in [hosted-dogfood.md](hosted-dogfood.md), section 7). For every run before that, and any after it: a `done-check` run whose request starts with a harness envelope (`<task-notification>`, `<wake`, `<webhook-payload>` or `<child-session-event>`) is not a labeled Stop. It never counts toward ADR-021's 200 labeled Stops or its precision bar.
+The fix is kit 0.4.0 with the plugin pinned to it. It skips the wake-ups, and it also skips the summary Claude Code writes when it compacts a long session: on this session's own transcript the old code sent that summary as the request on 106 of 929 Stops, the new code on none. Then publish the current `.bandwise/sets/done-check.json` as a new hosted version at `shadow`:
+
+```sh
+bwa spec push .bandwise/sets/done-check.json --set done-check
+bwa spec diff .bandwise/sets/done-check.json
+bwa publish done-check --changelog "waiting_on_event and the wake-up skip"
+```
+
+`bwa rollback done-check` steps back, as in [hosted-dogfood.md](hosted-dogfood.md), section 8. For every run before the release, and any after it: a `done-check` run whose request starts with a harness envelope (`<task-notification>`, `<wake`, `<webhook-payload>` or `<child-session-event>`) or a compaction summary ("This session is being continued from a previous conversation" or `<artifact-content-authored-by-others/>`) is not a labeled Stop. It never counts toward ADR-021's 200 labeled Stops or its precision bar.
 
 ## Jev 1.14 (D5)
 

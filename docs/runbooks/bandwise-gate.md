@@ -14,7 +14,7 @@ The plugin depends on two things that are not in this repo:
    npm view @bandwise/cli@0.4.0 version
    ```
 
-   Until the pinned version is out, `npx` finds no matching version and each hook ends silently. Nothing breaks, but nothing runs either. So push the tag soon after the pin change merges.
+   Until the pinned version is on npm, `npx` fails with `npm error code ETARGET` and exits 1. Claude Code shows that as a non-blocking hook error on each gated tool call and on each Stop. Nothing is blocked and nothing runs. So push the tag right after the pin change merges, and don't install or update the plugin (`claude plugin marketplace update bandwise`) until `npm view` above prints the version.
 
 2. **D2e live (Nick).** The hooks call `POST https://app.bandwise.dev/api/v1/sets/<slug>/run`, and the MCP entry points at `https://app.bandwise.dev/mcp`. Both need hosted dogfood turned on, as in [hosted-dogfood.md](hosted-dogfood.md). `/mcp` also needs ADR-021 rollout step 1 (the remote MCP slice) merged and deployed. Before that, the hooks still work once D2e is live, and the MCP tools fail to connect.
 
