@@ -2,11 +2,11 @@
 // test makes a network call (golden rule 7).
 
 import { SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, type SystemOneTransport } from "@bandwise/core";
-import { FixtureTransport, type Fixture, fixtureKey, loadBundledFixtures } from "@bandwise/system-one-client/fixture";
+import { FixtureTransport, type Fixture, fixtureKey, loadBundledFixtures, loadProviderFixtures } from "@bandwise/system-one-client/fixture";
 import { describe, expect, it } from "vitest";
 import { offlineTransport } from "../ports.js";
 import { recordMain, smokeMain } from "./cli.js";
-import { planRecording, scrubFixture } from "./record.js";
+import { RecordPlanError, planRecording, scrubFixture } from "./record.js";
 import { smokeList, versionedResolved } from "./smoke.js";
 
 function io(env: Record<string, string | undefined>, extra: Record<string, unknown> = {}) {
@@ -138,7 +138,7 @@ describe("pnpm fixtures:record", () => {
       expect(await recordMain(["--provider", provider], t.io)).toBe(0);
       // The evaluation fallback fixture is rejected by the client, and hand-authored fixtures pin an
       // answer on purpose, so neither is re-recorded.
-      const expected = bundled.filter((f) => f.provider === provider && "response" in f && f.name !== "evaluation-fallback" && f.source !== "hand-authored");
+      const expected = loadProviderFixtures(provider).filter((f) => "response" in f && f.name !== "evaluation-fallback" && f.source !== "hand-authored");
       expect(written.size).toBe(expected.length);
       for (const f of expected) {
         const w = written.get(`${provider}/${f.name}.json`);
@@ -174,11 +174,34 @@ describe("pnpm fixtures:record", () => {
     expect(t.err[0]).toMatch(/^failed .*system_one_invalid_request/);
   });
 
+  it("re-sends only the provider folder's own fixtures, never a model folder's", async () => {
+    // fixtures/typesafe/jev-1.14.0/ holds the same names as fixtures/typesafe/. Planning from both
+    // would write the 1.14 answers over the 1.13 fixtures, so the plan refuses it.
+    expect(bundled.some((f) => f.provider === "typesafe" && f.request.model === "jev-1.14.0")).toBe(true);
+    for (const model of [undefined, "jev-1.14.0"]) {
+      expect(() => planRecording(bundled, "typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, model)).toThrow(RecordPlanError);
+      expect(() => planRecording(bundled, "typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, model)).toThrow(/two fixtures would be written to typesafe\//);
+    }
+
+    const plain: Fixture[] = [];
+    const t = io({ TYPESAFE_API_KEY: "sk" }, { transport: new FixtureTransport(bundled), fetchOpenapiVersion: async () => "0.2.0", write: (_p: string, f: Fixture) => plain.push(f) });
+    expect(await recordMain([], t.io)).toBe(0);
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.some((f) => f.request.model === "jev-1.14.0")).toBe(false);
+
+    const paths: string[] = [];
+    const m = io({ TYPESAFE_API_KEY: "sk" }, { transport: offlineTransport(), fetchOpenapiVersion: async () => "0.2.0", write: (p: string) => paths.push(p) });
+    expect(await recordMain(["--model", "jev-1.14.0"], m.io)).toBe(0);
+    expect(paths.length).toBeGreaterThan(0);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(paths.every((p) => p.startsWith("typesafe/jev-1.14.0/"))).toBe(true);
+  });
+
   it("never re-records a hand-authored fixture", () => {
     const half = bundled.find((f) => f.provider === "typesafe" && f.name === "noul-near-half");
     expect(half?.source).toBe("hand-authored");
     for (const model of [undefined, "jev-preview"]) {
-      const plan = planRecording(bundled, "typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, model);
+      const plan = planRecording(loadProviderFixtures("typesafe"), "typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, model);
       expect(plan.length).toBeGreaterThan(0);
       expect(plan.some((t) => t.name === "noul-near-half")).toBe(false);
     }

@@ -128,7 +128,7 @@ A spec error names the field and the lint:
 
 | HTTP | Code | Retryable | When |
 |---|---|---|---|
-| 400 | `invalid_state` | no | State fails `input.schema`; `details` point into the state |
+| 400 | `invalid_state` | no | State fails `input.schema`; `details` point into the state. A run whose state the System One client will not send (a literal `<image:` reference, [system-one-api-contract.md](system-one-api-contract.md), Watch) is stored as a failed run with this code instead |
 | 400 | `invalid_request` | no | Body or query fails the operation's input schema, or a required header is missing; `details` point at the fields |
 | 401 | `unauthenticated` | no | Missing or bad token |
 | 402 | `quota_exceeded` | no | Plan quota reached; body includes upgrade link |

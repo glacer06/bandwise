@@ -27,6 +27,7 @@ To re-record later, from your shell with `TYPESAFE_API_KEY` set:
 
 ```sh
 pnpm fixtures:record          # rewrites the recorded success fixtures in packages/system-one-client/fixtures/typesafe
+pnpm fixtures:record --model jev-1.14.0   # and each model folder, or the fixture contract test fails after a version bump
 pnpm smoke                    # checks jev-preview, jev-latest and every preview or stable registry model (jev-1.13.0, jev-1.14.0); prints cost per model
 git diff --stat packages/system-one-client/fixtures
 ```
@@ -51,7 +52,15 @@ pnpm smoke
 pnpm smoke --model jev-1.14.0
 ```
 
-The first writes `packages/system-one-client/fixtures/typesafe/jev-1.14.0/`. The second should show `jev-preview` answered by `jev-1.14.0`. Commit the fixtures, and write the cost and latency here.
+The first writes `packages/system-one-client/fixtures/typesafe/jev-1.14.0/`. The second should show `jev-preview` answered by `jev-1.14.0`.
+
+Done on 2026-10-15, after the SDK 0.7 upgrade, from a cloud session whose environment injects the TypeSafe credential:
+
+- `pnpm smoke` passed all 48 checks on `jev-preview`, `jev-latest`, `jev-1.13.0` and `jev-1.14.0`. `jev-preview` was answered by `jev-1.14.0` and `jev-latest` by `jev-1.13.0`.
+- Cost: $0.000074 per model for the smoke's three single questions and two-stage run, the same on 1.13 and 1.14, about $0.0003 for the four names. The smoke does not time calls, so there is no latency number yet.
+- `pnpm fixtures:record --model jev-1.14.0` wrote seven fixtures. On those requests 1.14 answered like 1.13, within 0.02 on every probability, with the same input token counts. Seven requests are a sanity check, not an eval.
+
+To run these from a cloud session like that one, Node's `fetch` needs `NODE_USE_ENV_PROXY=1` to use the session's proxy, and the SDK needs a non-empty `TYPESAFE_API_KEY`, which the proxy replaces with the real credential. From your own shell, your key is enough.
 
 To see one set's own states on 1.14, run a copy of its spec from `/tmp`. The file the hooks read stays on 1.13, the receipts go to their own file, and every run passes `--rollout shadow`. Without it `bandwise run --live` runs at `full`, and the receipts would record a full stage on a preview model:
 

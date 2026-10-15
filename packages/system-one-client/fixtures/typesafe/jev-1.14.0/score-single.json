@@ -1,0 +1,51 @@
+{
+  "name": "score-single",
+  "provider": "typesafe",
+  "openapiVersion": "0.2.0",
+  "request": {
+    "state": {
+      "ticket": {
+        "subject": "Charged twice",
+        "body": "Help! I was charged twice for my plan this month and I need a refund today."
+      }
+    },
+    "model": "jev-1.14.0",
+    "questions": {
+      "frustration": {
+        "type": "score",
+        "instructions": "How frustrated is the customer who wrote `ticket`?",
+        "criteria": [
+          "Calm",
+          "Frustrated",
+          "Very angry"
+        ]
+      }
+    }
+  },
+  "requestId": "req_fx_score_single",
+  "source": "recorded",
+  "response": {
+    "model": "jev-1.14.0",
+    "answers": {
+      "frustration": {
+        "type": "score",
+        "score": 1,
+        "legend": {
+          "0": "Calm",
+          "1": "Frustrated",
+          "2": "Very angry"
+        },
+        "probabilities": {
+          "0": 0,
+          "1": 0.99,
+          "2": 0.01
+        },
+        "confidence": 0.98
+      }
+    },
+    "usage": {
+      "input_tokens": 345,
+      "output_tokens": 19
+    }
+  }
+}

@@ -27,6 +27,7 @@ export function isRunRefusedError(e: unknown): e is RunRefusedError {
 
 /** Generic messages per failure code. Provider messages never reach a caller. */
 export const RUN_ERROR_MESSAGES: Partial<Record<ErrorCode, string>> = {
+  invalid_state: "The state holds text that cannot be sent to System One.",
   system_one_auth: "The org's System One key was rejected.",
   system_one_forbidden: "The org's System One key cannot use this model.",
   system_one_invalid_request: "System One rejected the request.",

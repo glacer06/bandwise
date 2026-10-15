@@ -25,7 +25,7 @@ import {
 } from "@bandwise/core";
 import { describe, expect, it } from "vitest";
 import { FixtureTransport } from "./fixture-transport.js";
-import { BUNDLED_FIXTURES_DIR, loadBundledFixtures, loadFixturesFromDir } from "./load.js";
+import { BUNDLED_FIXTURES_DIR, loadBundledFixtures, loadFixturesFromDir, loadProviderFixtures } from "./load.js";
 import { syntheticResponse } from "./synthetic.js";
 
 const fixtures = loadBundledFixtures();
@@ -113,6 +113,17 @@ describe("FixtureTransport", () => {
     expect(loadFixturesFromDir(`${BUNDLED_FIXTURES_DIR}openrouter`)).toHaveLength(6);
     expect(loadFixturesFromDir(`${BUNDLED_FIXTURES_DIR}vercel`)).toHaveLength(5);
     expect(() => loadFixturesFromDir(new URL("../../contract/", import.meta.url).pathname)).toThrow(/invalid fixture/);
+  });
+
+  it("reads a provider folder without its model folders when asked", () => {
+    const onPreview = (f: { provider: string; request: { model: string } }) => f.provider === "typesafe" && f.request.model === "jev-1.14.0";
+    // The bundled set holds the typesafe/jev-1.14.0/ model folder; the provider's own fixtures do not.
+    expect(fixtures.some(onPreview)).toBe(true);
+    const own = loadProviderFixtures("typesafe");
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.some(onPreview)).toBe(false);
+    expect(own).toEqual(loadFixturesFromDir(`${BUNDLED_FIXTURES_DIR}typesafe`, { recursive: false }));
+    expect(loadFixturesFromDir(`${BUNDLED_FIXTURES_DIR}typesafe`).length).toBeGreaterThan(own.length);
   });
 });
 

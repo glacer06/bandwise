@@ -82,7 +82,7 @@
     "answers": {
       "real_person": {
         "type": "noul",
-        "noul": 0.9
+        "noul": 0.89
       },
       "someone_waiting": {
         "type": "noul",
@@ -109,12 +109,12 @@
         "type": "choice",
         "choice": "work_request",
         "probabilities": {
-          "transactional": 0,
-          "personal": 0,
           "work_request": 1,
           "scheduling": 0,
-          "none_of_these": 0,
-          "newsletter": 0
+          "personal": 0,
+          "newsletter": 0,
+          "transactional": 0,
+          "none_of_these": 0
         },
         "confidence": 1
       },
@@ -122,9 +122,9 @@
         "type": "choice",
         "choice": "decision",
         "probabilities": {
+          "decision": 1,
           "information": 0,
           "review": 0,
-          "decision": 1,
           "none_of_these": 0
         },
         "confidence": 1
