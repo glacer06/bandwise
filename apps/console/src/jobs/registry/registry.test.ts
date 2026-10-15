@@ -60,8 +60,8 @@ describe("registry sync", () => {
     const fetch = replayFetch([rec("typesafe-models.json")]);
     const r = await registrySync({ ...deps, fetch }, { orgId: ORG_A, provider: "typesafe", apiKey: "sk-test", now: NOW });
     expect(r).toMatchObject({ ok: true, listed: ["jev-latest", "jev-preview"], insertedUnreviewed: [], unmapped: [] });
-    // jev-1.13.0 is not listed but is the observed target of a listed alias.
-    expect(r.reachable).toEqual(["jev-1.13.0", "jev-latest", "jev-preview"]);
+    // jev-1.13.0 and jev-1.14.0 are not listed but are the targets of listed aliases.
+    expect(r.reachable).toEqual(["jev-1.13.0", "jev-1.14.0", "jev-latest", "jev-preview"]);
     expect(store.keyModels.get(`${ORG_A}:typesafe`)).toEqual(r.reachable);
     expect(fetch.seen).toEqual(["GET https://api.typesafe.ai/v1/models"]);
     expect(fetch.auth).toEqual(["Bearer sk-test"]);
@@ -173,24 +173,25 @@ describe("alias observation", () => {
     await observeAlias(deps, { provider: "typesafe", alias: "jev-latest", resolved: "jev-1.13.0", at: new Date("2026-09-26T00:00:00Z") });
     recorder.events.length = 0;
 
-    const move = { provider: "typesafe" as const, alias: "jev-latest", resolved: "jev-1.14.0", at: NOW };
+    // jev-1.15.0 stands for a build the seed has never seen (jev-1.14.0 is a seed row now).
+    const move = { provider: "typesafe" as const, alias: "jev-latest", resolved: "jev-1.15.0", at: NOW };
     const first = await observeAlias(deps, move);
     const replay = await observeAlias(deps, { ...move, at: new Date(NOW.getTime() + 60_000) });
     expect(first).toMatchObject({ recorded: true, moved: true, fromResolvedId: "jev-1.13.0", insertedUnreviewed: true });
     expect(replay).toMatchObject({ recorded: true, moved: false });
-    expect(store.observations.filter((o) => o.resolvedId === "jev-1.14.0")).toHaveLength(1);
+    expect(store.observations.filter((o) => o.resolvedId === "jev-1.15.0")).toHaveLength(1);
     const moved = recorder.events.filter((e) => e.type === "model.alias_moved");
     expect(moved).toEqual([
       {
         type: "model.alias_moved",
         orgId: ORG_A,
         subject: { type: "model", id: "jev-latest" },
-        data: { provider: "typesafe", alias: "jev-latest", fromResolvedId: "jev-1.13.0", toResolvedId: "jev-1.14.0", affectedSetIds: [SET_A] },
+        data: { provider: "typesafe", alias: "jev-latest", fromResolvedId: "jev-1.13.0", toResolvedId: "jev-1.15.0", affectedSetIds: [SET_A] },
       },
     ]);
     // The unseen build is inserted as unreviewed and the alias row points at it.
-    expect(recorder.events.filter((e) => e.type === "model.unreviewed").map((e) => e.data)).toEqual([{ modelId: "jev-1.14.0", seenVia: "observation" }]);
-    expect(store.rows.get("jev-latest")?.aliasTarget).toBe("jev-1.14.0");
+    expect(recorder.events.filter((e) => e.type === "model.unreviewed").map((e) => e.data)).toEqual([{ modelId: "jev-1.15.0", seenVia: "observation" }]);
+    expect(store.rows.get("jev-latest")?.aliasTarget).toBe("jev-1.15.0");
     assertEnvelopes(recorder.events);
   });
 
@@ -211,17 +212,22 @@ describe("alias observation", () => {
 describe("alias probe", () => {
   it("TypeSafe: probes each idle alias with a one-noul request and records the build", async () => {
     const { store, recorder, deps } = world();
+    // typesafe-probe-jev-preview.json was hand-edited on 2026-10-15 from models.md (jev-preview points
+    // at jev-1.14.0), not recorded. Re-record it with TYPESAFE_API_KEY.
     const fetch = replayFetch([rec("typesafe-probe-jev-latest.json"), rec("typesafe-probe-jev-preview.json")]);
     const r = await probeIdleAliases({ ...deps, transport: new SdkTransport({ fetch }) }, { provider: "typesafe", apiKey: "sk-test", now: NOW });
     expect(r.probed.map((p) => [p.alias, p.resolved])).toEqual([
       ["jev-latest", "jev-1.13.0"],
-      ["jev-preview", "jev-1.13.0"],
+      ["jev-preview", "jev-1.14.0"],
     ]);
     expect(r.failed).toEqual([]);
     expect(fetch.seen).toEqual(["POST https://api.typesafe.ai/v1/systemone", "POST https://api.typesafe.ai/v1/systemone"]);
-    expect(store.observations.map((o) => `${o.alias}->${o.resolvedId}`)).toEqual(["jev-latest->jev-1.13.0", "jev-preview->jev-1.13.0"]);
+    expect(store.observations.map((o) => `${o.alias}->${o.resolvedId}`)).toEqual(["jev-latest->jev-1.13.0", "jev-preview->jev-1.14.0"]);
     // First sighting of jev-latest is reported to the org on it; nobody uses jev-preview.
     expect(recorder.events.map((e) => e.type)).toEqual(["model.alias_moved"]);
+    // jev-1.14.0 is a reviewed seed row, so nothing is inserted and jev-preview keeps its seed target.
+    expect(store.rows.get("jev-1.14.0")).toMatchObject({ kind: "versioned", status: "preview" });
+    expect(store.rows.get("jev-preview")?.aliasTarget).toBe("jev-1.14.0");
 
     // Probed again the same day: both aliases are skipped.
     const again = await probeIdleAliases({ ...deps, transport: new SdkTransport({ fetch }) }, { provider: "typesafe", apiKey: "sk-test", now: new Date(NOW.getTime() + 3_600_000) });
@@ -275,8 +281,10 @@ describe("contract watch", () => {
   it("snapshots are TypeSafe's documents as recorded (openapi 0.2.0, three question types)", () => {
     const doc = JSON.parse(snapshots.openapi) as { info: { version: string } };
     expect(doc.info.version).toBe("0.2.0");
-    expect(snapshots.llms_txt).toContain("# TypeSafe AI");
+    // llms.txt and models.md were re-snapshotted on 2026-10-15; openapi.json waits for the Box and images decision.
+    expect(snapshots.llms_txt.split("\n")[0]).toBe("# TypeSafe");
     expect(snapshots.models_md).toContain("`jev-1.13.0`");
+    expect(snapshots.models_md).toContain("`jev-1.14.0`");
   });
 
   it("is quiet when the live documents match the snapshots", async () => {
@@ -321,7 +329,8 @@ describe("contract watch", () => {
 
   it("flags added and removed lines in llms.txt and models.md", async () => {
     const r = createRecorder();
-    const models = snapshots.models_md.replace("| `jev-latest`  | `jev-1.13.0` |", "| `jev-latest`  | `jev-1.14.0` |");
+    const models = snapshots.models_md.replace("| `jev-latest` | `jev-1.13.0` |", "| `jev-latest` | `jev-1.14.0` |");
+    expect(models).not.toBe(snapshots.models_md);
     const llms = `${snapshots.llms_txt}\n- [Rank](https://docs.typesafe.ai/primitives/rank.md): A new question type.\n`;
     const result = await contractWatch({ fetch: live({ models_md: models, llms_txt: llms }), snapshots, events: r, alerts: r, issues: r });
     expect(result.changed.llms_txt).toEqual([{ kind: "line_added", line: "- [Rank](https://docs.typesafe.ai/primitives/rank.md): A new question type." }]);

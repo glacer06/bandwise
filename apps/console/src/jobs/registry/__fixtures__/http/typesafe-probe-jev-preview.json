@@ -1,5 +1,5 @@
 {
-  "note": "Stand-in, hand-authored from the documented response shape (no TypeSafe key on 2026-09-27). The request is system-one-client's aliasProbeRequest.",
+  "note": "Stand-in, hand-authored from the documented response shape (no TypeSafe key on 2026-09-27). The request is system-one-client's aliasProbeRequest. Hand-edited on 2026-10-15 from docs.typesafe.ai/models.md, which points jev-preview at jev-1.14.0. Not a recorded response: re-record with TYPESAFE_API_KEY.",
   "request": {
     "method": "POST",
     "url": "https://api.typesafe.ai/v1/systemone",
@@ -12,7 +12,7 @@
       "x-typesafe-request-id": "req_fx_probe_preview"
     },
     "body": {
-      "model": "jev-1.13.0",
+      "model": "jev-1.14.0",
       "answers": {
         "probe": {
           "type": "noul",
