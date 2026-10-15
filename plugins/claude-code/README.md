@@ -20,7 +20,7 @@ claude plugin marketplace add glacer06/bandwise
 claude plugin install bandwise-gate@bandwise
 ```
 
-The hooks run `npx -y @bandwise/cli@0.3.0` from this plugin's own folder, so a project you open can never swap in its own copy of the CLI. The machine needs Node 22 or later and npm. The first hook call downloads the CLI; later calls use the npm cache.
+The hooks run `npx -y @bandwise/cli@0.4.0` from this plugin's own folder, so a project you open can never swap in its own copy of the CLI. The machine needs Node 22 or later and npm. The first hook call downloads the CLI; later calls use the npm cache.
 
 ## Set the tokens
 

@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type ExportReport, KIT_VERSION, PUBLISHED_PACKAGES, exportKit, readCatalog } from "./export.js";
+import { type ExportReport, KIT_VERSION, PUBLISHED_PACKAGES, REPO_ROOT, exportKit, readCatalog } from "./export.js";
 
 let out = "";
 let report: ExportReport;
@@ -153,5 +153,19 @@ describe("exportKit", () => {
     expect(again.findings).toEqual([]);
     expect(existsSync(join(out, "stale.txt"))).toBe(false);
     expect(existsSync(join(out, "pnpm-lock.yaml"))).toBe(true);
+  });
+});
+
+describe("the bandwise-gate plugin", () => {
+  // The plugin runs the CLI from npm at an exact version. A fix that never reaches that version
+  // never reaches the plugin: CLI 0.3.0 kept reading cloud wake-ups as requests for nine days
+  // after main had the fix. So the pin moves with KIT_VERSION, in the same change.
+  it("pins the CLI version this kit releases, everywhere it names one", () => {
+    for (const rel of ["plugins/claude-code/hooks/hooks.json", "plugins/claude-code/README.md"]) {
+      const text = readFileSync(join(REPO_ROOT, rel), "utf8");
+      const pins = [...text.matchAll(/@bandwise\/cli@([0-9][^\s"`]*)/g)].map((m) => m[1]);
+      expect(pins.length, rel).toBeGreaterThan(0);
+      expect(new Set(pins), rel).toEqual(new Set([KIT_VERSION]));
+    }
   });
 });
