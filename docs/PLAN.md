@@ -189,7 +189,7 @@ Later phases follow the same pattern: load the skill, open the phase file, stay 
 - **Jev 1.14 decisions for Nick:**
   - An ADR-008 amendment covering per-organization rate limits (`rpm` and `tokensPerSec` are required fields, and both versioned Jev rows now carry 1.13's last published values), the long-context header, and a rule that keeps a `preview` model out of `controlled` and `full` in the publish lints and `planRollout`. The rule comes before any org opts in to preview models.
   - An ADR, or a short "not adopted in v1" note, for `box` questions and images, before the `openapi.json` snapshot is refreshed.
-  - Merging the SDK 0.7 PR after PJ's Security review, since it changes the module that carries the key.
+  - PJ's Security review of the SDK 0.7 change to `sdk-transport.ts`, the module that carries the key (PR #36). Nick chose on 2026-10-15 to merge it without waiting for that review, so anything PJ finds lands as a follow-up.
   - Whether the next kit and `@bandwise/cli` npm release ships the preview row. Customers could then run `jev-1.14.0` with their own key in local live mode, where publish lints do not apply.
   - How the Phase 3b candidates job orders `jev-1.13.0` before `jev-1.14.0` without reading versions out of ids. `jev-1.13.0` has `releaseDate` null, so the registry has nothing to order by yet.
   - An ADR-010 clarification of whether a deliberate repin counts as "the resolved model changes" for auto-demote, before the Phase 3 job is built.

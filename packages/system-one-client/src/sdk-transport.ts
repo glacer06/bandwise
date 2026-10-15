@@ -52,6 +52,14 @@ export const SDK_LOG_LEVEL = "warn" as const;
  */
 export const SDK_COMPRESSION: Compression = false;
 
+/**
+ * SDK 0.7 reads this pattern anywhere in a request as a reference to an attached image and, with no
+ * image attached, rejects the call before sending. Bandwise attaches no images, so a match in the
+ * state is caller text the SDK will not send: it fails as invalid_state, not as a System One
+ * rejection. A match in a question's text is a spec problem and stays system_one_invalid_request.
+ */
+export const SDK_IMAGE_REFERENCE = /<image:[0-9a-f]{32}>/;
+
 export interface SdkTransportOptions {
   /** Where the scrubbing logger writes. Default: console. */
   logSink?: LogSink;
@@ -96,7 +104,8 @@ export function mapSdkError(e: unknown, provider: SystemOneProvider): TransportE
   }
   if (e instanceof APIError) return transportErrorForStatus(e.status, provider, e.requestId ?? null);
   if (e instanceof TypeSafeError) {
-    // Raised before sending, for example empty questions or a null state: a compiler bug.
+    // Raised before sending, for example empty questions, a null state, or an image reference in a
+    // question's text: a compiler or spec bug. An image reference in the state is caught in call().
     return new TransportError({ code: "system_one_invalid_request", retryable: false, requestId: null }, "the SDK rejected the request before sending it");
   }
   return new TransportError(
@@ -123,6 +132,12 @@ export class SdkTransport implements SystemOneTransport {
   }
 
   async call(req: SystemOneRequest, opts: SystemOneCallOptions): Promise<SystemOneCallResult> {
+    if (req.state != null && SDK_IMAGE_REFERENCE.test(JSON.stringify(req.state))) {
+      throw new TransportError(
+        { code: "invalid_state", retryable: false, requestId: null },
+        "the state holds a literal <image:...> reference, which the SDK will not send without an attached image",
+      );
+    }
     const client = this.clients.getOrCreate(opts.provider, opts.apiKey, () =>
       createSdkClient(opts.provider, opts.apiKey, req.model, this.options),
     );

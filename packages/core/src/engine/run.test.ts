@@ -215,6 +215,8 @@ describe("failed runs return the envelope with status and error", () => {
   it.each([
     ["system_one_rate_limited", "system_one_rate_limited"],
     ["system_one_auth", "system_one_auth"],
+    // The SDK transport's refusal of state the SDK will not send (a literal image reference).
+    ["invalid_state", "invalid_state"],
   ] as const)("a transport %s fails the run with %s and no decisions", async (thrown, code) => {
     const h = makePorts({ transport: scriptedTransport(() => transportError(thrown)) });
     const result = await runQuestionSet(ctx, runRequest(exampleState()), resolvedRun(exampleSpec()), h.ports, control());
@@ -239,6 +241,12 @@ describe("failed runs return the envelope with status and error", () => {
     expect(isOutageRun(result)).toBe(true);
     expect(isOutageCode(code)).toBe(true);
     expect(h.runs.records).toHaveLength(1);
+  });
+
+  it("a state the SDK will not send says so, not that System One rejected it", async () => {
+    const h = makePorts({ transport: scriptedTransport(() => transportError("invalid_state")) });
+    const result = await runQuestionSet(ctx, runRequest(exampleState()), resolvedRun(exampleSpec()), h.ports, control());
+    expect(result.error).toEqual({ code: "invalid_state", message: "The state holds text that cannot be sent to System One." });
   });
 
   it("a non-transport error from the transport is system_one_unavailable", async () => {

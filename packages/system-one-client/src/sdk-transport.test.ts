@@ -248,11 +248,26 @@ describe("error mapping", () => {
     expect(seen).toHaveLength(0);
   });
 
-  it("a state holding a literal SDK image reference is rejected before sending (SDK 0.7)", async () => {
+  it("a state holding a literal SDK image reference fails as invalid_state before sending (SDK 0.7)", async () => {
     const seen: Seen[] = [];
     const t = new SdkTransport({ fetch: fakeFetch(200, okBody, {}, seen) });
-    const state = { ticket: `see <image:${"a".repeat(32)}> attached` };
-    const err = await t.call({ ...request, state }, opts()).catch((e: unknown) => e);
+    for (const state of [{ ticket: `see <image:${"a".repeat(32)}> attached` }, { notes: [{ [`<image:${"0".repeat(32)}>`]: 1 }] }]) {
+      const err = await t.call({ ...request, state }, opts()).catch((e: unknown) => e);
+      expect(err).toMatchObject({ code: "invalid_state", retryable: false, requestId: null });
+      expect(String((err as Error).message)).not.toContain("0".repeat(32));
+    }
+    expect(seen).toHaveLength(0);
+    // The SDK matches lowercase hex only, so other spellings are plain text and are sent.
+    const upper = { ticket: `see <image:${"A".repeat(32)}> attached` };
+    await expect(t.call({ ...request, state: upper }, opts())).resolves.toMatchObject({ response: okBody });
+    expect(seen).toHaveLength(1);
+  });
+
+  it("an image reference in a question's text stays system_one_invalid_request (a spec problem)", async () => {
+    const seen: Seen[] = [];
+    const t = new SdkTransport({ fetch: fakeFetch(200, okBody, {}, seen) });
+    const questions = { is_urgent: { type: "noul", instructions: `Look at <image:${"b".repeat(32)}>.` } } as SystemOneRequest["questions"];
+    const err = await t.call({ ...request, questions }, opts()).catch((e: unknown) => e);
     expect(err).toMatchObject({ code: "system_one_invalid_request", retryable: false });
     expect(seen).toHaveLength(0);
   });

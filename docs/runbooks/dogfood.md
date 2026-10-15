@@ -27,6 +27,7 @@ To re-record later, from your shell with `TYPESAFE_API_KEY` set:
 
 ```sh
 pnpm fixtures:record          # rewrites the recorded success fixtures in packages/system-one-client/fixtures/typesafe
+pnpm fixtures:record --model jev-1.14.0   # and each model folder, or the fixture contract test fails after a version bump
 pnpm smoke                    # checks jev-preview, jev-latest and every preview or stable registry model (jev-1.13.0, jev-1.14.0); prints cost per model
 git diff --stat packages/system-one-client/fixtures
 ```
