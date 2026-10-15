@@ -1,6 +1,6 @@
 # System One models
 
-Owner: Platform / Tenancy (the `system_one_models` table, registry sync, alias probe, contract watch, platform Models page). Core Engine owns the `ModelProfile` contract, the `ModelCatalog` port, preflight, lints and the question-type modules. Decision records: [ADR-008](../../../../docs/adr/008-system-one-model-registry.md), and [ADR-011](../../../../docs/adr/011-openrouter-route.md) (proposed) for providers and routes (section 15). Facts checked against `docs.typesafe.ai` and `https://api.typesafe.ai/openapi.json` (info.version 0.2.0) on 2026-09-26. The live docs win.
+Owner: Platform / Tenancy (the `system_one_models` table, registry sync, alias probe, contract watch, platform Models page). Core Engine owns the `ModelProfile` contract, the `ModelCatalog` port, preflight, lints and the question-type modules. Decision records: [ADR-008](../../../../docs/adr/008-system-one-model-registry.md), and [ADR-011](../../../../docs/adr/011-openrouter-route.md) (proposed) for providers and routes (section 15). Facts checked against `docs.typesafe.ai` and `https://api.typesafe.ai/openapi.json` (info.version 0.2.0) on 2026-09-26. Jev 1.14 (`jev-1.14.0`), the rate limit wording and the question types were re-checked against `models.md`, `openapi.json` and the SDK changelogs on 2026-10-15. The live docs win.
 
 ## 1. Scope
 
@@ -74,6 +74,8 @@ A model name is pinned only when the registry marks it `kind: "versioned"`. Alia
 | `jev` | moving | Partial ID used in TypeSafe's examples; not a versioned row |
 | `jev-1.13` | moving | Partial ID; not a versioned row |
 | `jev-1.13.0` | pinned | Versioned row |
+| `jev-1.14` | moving | Partial ID; not a versioned row |
+| `jev-1.14.0` | pinned | Versioned row. Its status is `preview` (section 13), which limits which orgs may publish on it, not whether it is pinned |
 | `foo-2.0.0` (never seen) | moving, inserted as `unreviewed` | The registry sync inserts unseen names with `kind: "alias"` until the platform admin reviews them |
 
 - Moving models are allowed only in the `inactive` and `shadow` rollout stages.
@@ -119,7 +121,7 @@ A candidate found only through `supersedes` is marked cross-family. Without `sup
 
 - Preflight, lints and default limiter budgets read the profile, never constants. On a provider other than TypeSafe they read the effective limits: each profile limit tightened by the route row's value (`effectiveLimits`, section 15). jev-1.13.0 through OpenRouter gets 32,000 tokens per request, not 64,000. Signatures are `preflight(spec, state, profile)` and `lint(spec, profile, publishCtx?)`. `publishCtx` carries the channel rollout stage, the current interface, consumers and the models the org key can reach ([architecture.md](architecture.md), Lints). Lints that need it are skipped when it is absent; publish and promote always pass it.
 - For a moving name they use the profile of its last observed resolved model. In the playground, a row with null limits falls back to the observed target's limits, or to the smallest limits among stable profiles when there is no target.
-- Default limiter budgets are a per-model setting, about 83 percent of the published `rpm` (about 1,000 requests per minute for `jev-1.13.0`). Limiter keys include the model. Evals use a separate bucket ([security.md](security.md)).
+- Default limiter budgets are a per-model setting, about 83 percent of the profile's `rpm` (about 1,000 requests per minute for `jev-1.13.0`). Its `rpm`, 1,200, is the last per-model value TypeSafe published. On 2026-10-15 `models.md` sets rate limits per organization instead, in tokens per second and requests per second, so the budget must also fit the platform key's own limits in TypeSafe's developer console (section 13). Limiter keys include the model. Evals use a separate bucket ([security.md](security.md)).
 - API-wide rules stay constants in [system-one-api-contract.md](system-one-api-contract.md): at most 255 options per choice, 2 to 10 score levels, and the question type union.
 
 ## 8. Pricing
@@ -133,7 +135,7 @@ A candidate found only through `supersedes` is marked cross-family. Without `sup
 
 ## 9. Question types
 
-- The v1 union `noul | choice | score` is closed by design. The OpenAPI `Question` is a `oneOf` discriminated on `type` with exactly these three.
+- The v1 union `noul | choice | score` is closed by design. The OpenAPI `Question` in the committed snapshot is a `oneOf` discriminated on `type` with exactly these three. The live `openapi.json` added a fourth, `box` (find a region in an image), without a version bump; it was there on 2026-10-15. Bandwise has not adopted `box` or image inputs ([system-one-api-contract.md](system-one-api-contract.md), Watch).
 - A new type needs an ADR, one `QuestionTypeModule` and one React renderer ([spec-schema.md](spec-schema.md), section 9). The contract watch flags a new discriminator key.
 - The editor, the Studio and the lints offer only the types in the target model's `questionTypes`.
 - An answer of an unknown type is stored raw with band `low`, effective action `fallback` and warning `unknown_answer_type`. Nothing throws.
@@ -141,6 +143,8 @@ A candidate found only through `supersedes` is marked cross-family. Without `sup
 ## 10. Weaknesses
 
 Weakness ids for `jev-1.13.0`, summarized from `docs.typesafe.ai/model-jaggedness/jev-1.13.md` (last reviewed by TypeSafe 2026-09-17).
+
+TypeSafe has no jaggedness page for Jev 1.14 yet: `model-jaggedness/jev-1.14.md` was not found on 2026-10-15. Until one exists, the `jev-1.14.0` row keeps all twelve ids below, so the weakness lints stay on for sets that target it. An empty list would read as "1.14 fixed them", and nothing published says so.
 
 | Id | Failure mode | Do this instead | Lint ([architecture.md](architecture.md)) |
 |---|---|---|---|
@@ -178,12 +182,11 @@ The end-to-end agent version of this flow is in [headless-and-agents.md](headles
 1. Read the model's entry on `docs.typesafe.ai/models.md` and its jaggedness page, if it has one.
 2. Review the row the registry sync inserted as `unreviewed`, or create one (platform Models page or `POST /api/v1/platform/models`). Fill `family`, `kind`, `releaseDate`, `limits`, `questionTypes`, `inputModalities`, `weaknesses`, `supersedes`, `docsUrl`, `jaggednessUrl` and `lastReviewed`. For an alias, fill `kind: "alias"` and let detection set `aliasTarget`. For the first model of a new family, list the models or families it replaces in `supersedes`, or existing sets never see it as an upgrade (section 6).
 3. Add a platform `price_books` row keyed by the exact versioned ID.
-4. Record fixtures for the new ID: `pnpm fixtures:record --model <id>` ([testing.md](testing.md)).
-5. Run `pnpm smoke --model <id>`.
-6. Set the status to `preview` or `stable`.
-7. Update the seed table below and `packages/core/src/models/catalog.ts`.
-8. If OpenRouter serves it, add a `system_one_model_routes` row from OpenRouter's model page and Models API (section 15), record fixtures with `--provider openrouter`, and run `pnpm smoke --model <id> --provider openrouter`.
-9. Decide whether new sets should start on it. If so, move the platform `defaultModel` to the new versioned ID (section 14). Existing sets move only through the upgrade flow (section 11).
+4. Set the status to `preview` or `stable`, and add the row and its price to the seed table below and to `packages/core/src/models/catalog.ts` in one PR. This comes before fixtures and smoke. `pnpm smoke` reads the seed rows and prices in code, so on an id with no seed row or price it fails the `versioned_model` and `cost` checks by design.
+5. Record fixtures for the new ID: `pnpm fixtures:record --model <id>` ([testing.md](testing.md)).
+6. Run `pnpm smoke --model <id>`.
+7. If OpenRouter serves it, add a `system_one_model_routes` row from OpenRouter's model page and Models API (section 15), record fixtures with `--provider openrouter`, and run `pnpm smoke --model <id> --provider openrouter`.
+8. Decide whether new sets should start on it. If so, move the platform `defaultModel` to the new versioned ID (section 14). Existing sets move only through the upgrade flow (section 11).
 
 If the model adds a question type, stop: that needs an ADR, a `QuestionTypeModule` and a renderer (section 9).
 
@@ -193,23 +196,28 @@ If the model adds a question type, stop: that needs an ADR, a `QuestionTypeModul
 |---|---|---|---|---|---|---|---|---|
 | `jev-1.13.0` | `jev` | versioned | stable | null | requestTokens 64,000; statePlusLongestQuestionTokens 32,000; rpm 1,200; tokensPerSec 250,000 | noul, choice, score | `["text"]` | all ids in section 10 |
 | `jev-latest` | `jev` | alias | stable | `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` |
-| `jev-preview` | `jev` | alias | preview | `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` | copy of `jev-1.13.0` |
+| `jev-preview` | `jev` | alias | preview | `jev-1.14.0` | copy of `jev-1.14.0` | copy of `jev-1.14.0` | copy of `jev-1.14.0` | copy of `jev-1.14.0` |
+| `jev-1.14.0` | `jev` | versioned | preview | null | requestTokens 64,000; statePlusLongestQuestionTokens 32,000; rpm 1,200; tokensPerSec 250,000 | noul, choice, score | `["text"]` | all ids in section 10 (no 1.14 jaggedness page yet) |
 
-- All three rows: `supersedes` `[]`, `retireAt` null, `docsUrl` `https://docs.typesafe.ai/models.md`, `lastReviewed` `2026-09-26`.
+- All rows: `supersedes` `[]`, `retireAt` null, `docsUrl` `https://docs.typesafe.ai/models.md`. `lastReviewed` is `2026-09-26` for `jev-1.13.0` and `jev-latest`, and `2026-10-15` for `jev-1.14.0` and `jev-preview`.
 - `jev-1.13.0`: `jaggednessUrl` `https://docs.typesafe.ai/model-jaggedness/jev-1.13.md`. `releaseDate` stays null until the platform admin confirms it, because `GET /v1/models` reports dates for the aliases only.
-- Alias seed rows copy `jev-1.13.0`'s `limits`, `questionTypes`, `inputModalities` and `weaknesses`, so each is a valid `stable` or `preview` row with non-null limits. They have `aliasTarget` `jev-1.13.0`, `releaseDate` null and `jaggednessUrl` null.
+- `jev-1.14.0`: `releaseDate` `2026-10-14`, because `models.md` says Jev 1.14 is "available from October 14, 2026". `jaggednessUrl` is null until TypeSafe publishes a 1.14 page (section 10). Price, context limits and input match `jev-1.13.0`. It is the last row in `SEED_MODEL_PROFILES`, after the aliases, because tests index the first two rows.
+- `jev-1.14.0` is `preview` by our reading of the alias table, not by TypeSafe's word. `models.md` lists Jev 1.14 under Current models and never calls it preview. But `jev-latest`, "the most recent stable, official release", still points to `jev-1.13.0`, and only `jev-preview` points to `jev-1.14.0`. When TypeSafe moves `jev-latest`, the platform admin reviews the row for `stable`. TypeSafe's Jev 1.14 blog post could not be read on 2026-10-15, so these facts come from `models.md` and the SDK changelogs only.
+- `models.md` does not say whether a build can change under its versioned id before `jev-latest` moves to it. Bandwise counts `jev-1.14.0` as pinned only because its row is `kind: "versioned"` (section 4). Confirm that before a set on it leaves `shadow`.
+- Alias seed rows copy their target's `limits`, `questionTypes`, `inputModalities` and `weaknesses`, so each is a valid `stable` or `preview` row with non-null limits. `jev-latest` has `aliasTarget` `jev-1.13.0` and `jev-preview` has `jev-1.14.0`. Both have `releaseDate` null and `jaggednessUrl` null.
 - `ModelCatalog` never uses an alias row's limits or weaknesses for a moving name. It uses the profile of the observed target (section 3). The copied values only keep the alias row valid.
-- TypeSafe says `jev-preview` moves ahead of `jev-latest` when a preview build exists, and none exists today.
+- TypeSafe says `jev-preview` moves ahead of `jev-latest` when a preview build is available. On 2026-10-15 `jev-preview` points to `jev-1.14.0` and `jev-latest` still points to `jev-1.13.0`.
 - English is the strongest language. Test other languages on the org's own content before routing on them.
-- TypeSafe says rate limits adjust dynamically and can change without notice. Treat `rpm` and `tokensPerSec` as the published values at `lastReviewed`.
-- Price row: `jev-1.13.0`, $0.042 per million input tokens, output free ([system-one-api-contract.md](system-one-api-contract.md)).
+- `models.md` no longer publishes per-model rate limits. On 2026-10-15 it says they are set per organization in TypeSafe's developer console, measured in tokens per second and requests per second. `rpm` 1,200 and `tokensPerSec` 250,000 are the last per-model values it published, for `jev-1.13.0`. `jev-1.14.0` repeats them because `ModelLimits` requires both fields. No limiter reads them yet (the limiters are Phase 2). Changing how rate limits are stored needs an ADR-008 amendment.
+- `models.md` also documents a `TypeSafe-Danger-Zone-Long-Context: true` header that raises both context limits to 262k tokens on Jev 1.13 and 1.14, slower and less accurate. Bandwise does not send it, and the seed rows carry the default limits only.
+- Price rows: `jev-1.13.0` and `jev-1.14.0`, each $0.042 per million input tokens, output free ([system-one-api-contract.md](system-one-api-contract.md)).
 - Route rows for OpenRouter and Vercel AI Gateway are in section 15 and `SEED_MODEL_ROUTES` in `catalog.ts`.
 
 ## 14. Default model
 
 Jev is the default because of a setting, not because code names it. No template, Studio path or operation hardcodes a model ID.
 
-- **Platform default.** The platform setting `defaultModel` names the model new sets start on. Seed value: `jev-1.13.0`. It changes through `platform_settings.update` ([management-api.md](management-api.md), Platform), which rejects a value that is not a `stable` versioned row.
+- **Platform default.** The platform setting `defaultModel` names the model new sets start on. Seed value: `jev-1.13.0`, which stays the default while `jev-1.14.0` is `preview`. It changes through `platform_settings.update` ([management-api.md](management-api.md), Platform), which rejects a value that is not a `stable` versioned row.
 - **Org override.** `organizations.settings.defaultModel` ([data-model.md](data-model.md)) changes through `settings.update`. It must be a `stable` versioned ID that the org's key can reach (section 3, Reachability); anything else is rejected with `400 invalid_request`. When the override is later no longer `stable` or reachable, the platform default applies.
 - **Who uses it.** `set.create` without `fromVersion` (a blank set or `fromTemplate`), `studio.create` (the session's target model) and template builds. `set.create` with `fromVersion` keeps that version's model.
 - **Templates never set `model`.** A `QuestionTemplate` builds a `Partial<QuestionSetSpec>` without `model`, and the operation that applies it fills the default ([definition-studio.md](definition-studio.md), `templates/plugin.template.ts`).
@@ -251,7 +259,7 @@ Seed route rows (OpenRouter's Jev pages and Models API, 2026-09-26):
 
 - OpenRouter lists Jev at $0.042 per million input tokens and $0 output, the same as TypeSafe, so no provider-specific price row is seeded. `usage.cost` carries the actual charge.
 - OpenRouter publishes no per-model rpm or tokens per second for Jev, so the route leaves them null and the profile's values apply as a ceiling. OpenRouter's own 429s map to `system_one_rate_limited`.
-- `jev-preview` has no OpenRouter route.
+- `jev-preview` and `jev-1.14.0` have no OpenRouter route.
 
 **Vercel AI Gateway (ADR-013, accepted 2026-09-27).** The third provider, `vercel`. Vercel's page "TypeSafe API with AI Gateway" (checked 2026-09-27) documents one model id, `typesafe-ai/jev`, and no versioned id. Seed route row:
 
@@ -259,7 +267,7 @@ Seed route rows (OpenRouter's Jev pages and Models API, 2026-09-26):
 |---|---|---|---|---|---|---|
 | `jev-latest` | vercel | `typesafe-ai/jev` | no | none (an alias) | all null: Vercel publishes none, so the profile's apply | `https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe` |
 
-- `jev-1.13.0` and `jev-preview` have no Vercel route, so they are not reachable on Vercel. Add a pinned row only after a versioned Vercel id is confirmed; until then `model.alias_past_shadow` keeps Vercel sets in `inactive` or `shadow`.
+- `jev-1.13.0`, `jev-1.14.0` and `jev-preview` have no Vercel route, so they are not reachable on Vercel. Add a pinned row only after a versioned Vercel id is confirmed; until then `model.alias_past_shadow` keeps Vercel sets in `inactive` or `shadow`.
 - The documented response `model` is `typesafe-ai/jev`, the id sent. It maps back to `jev-latest` through `providerModelId`, so the build that answered is unknown on this route.
 - `toVercelModelId` in core is the default and the seed's cross-check. The route row is authoritative.
 - `provider_metadata.gateway.cost` is the provider-reported cost (section 8). No Vercel price row is seeded.

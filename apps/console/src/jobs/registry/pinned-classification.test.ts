@@ -25,13 +25,16 @@ function classify(name: string, provider: SystemOneProvider, profiles: readonly 
 }
 
 // testing.md table. On OpenRouter every seed route is unpinned (typesafe/jev-1.13 answers with dated
-// builds), so the pinned TypeSafe id is moving there; jev-preview has no route at all.
+// builds), so the pinned TypeSafe id is moving there; jev-preview has no route at all. jev-1.14.0 has
+// no OpenRouter or Vercel route row either.
 const TABLE: Array<{ name: string; typesafe: "pinned" | "moving"; openrouter: "pinned" | "moving" }> = [
   { name: "jev-latest", typesafe: "moving", openrouter: "moving" },
   { name: "jev-preview", typesafe: "moving", openrouter: "moving" },
   { name: "jev", typesafe: "moving", openrouter: "moving" },
   { name: "jev-1.13", typesafe: "moving", openrouter: "moving" },
   { name: "jev-1.13.0", typesafe: "pinned", openrouter: "moving" },
+  { name: "jev-1.14", typesafe: "moving", openrouter: "moving" },
+  { name: "jev-1.14.0", typesafe: "pinned", openrouter: "moving" },
   { name: "foo-2.0.0", typesafe: "moving", openrouter: "moving" },
 ];
 

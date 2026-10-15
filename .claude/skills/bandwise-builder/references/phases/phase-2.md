@@ -23,7 +23,7 @@
 - [ ] Browser token minting route `POST /api/v1/tokens/browser` with ES256 (`BANDWISE_JWT_SIGNING_KEY`, `kid`) and the JWKS at `/api/v1/.well-known/jwks.json`
 - [ ] `org_webhook_secrets`, encrypted like System One keys
 - [ ] Retention settings split: `state_retention_days`, `answers_retention_days`, `dataset_retention_days`
-- [ ] Rate limiters: per org (plan), per token, an eval bucket (25 percent of org RPM by default, lowest priority), and a global budget per model from settings (about 1,000 RPM for `jev-1.13.0`) with per-org fair share. Limiter keys include the model.
+- [ ] Rate limiters: per org (plan), per token, an eval bucket (25 percent of org RPM by default, lowest priority), and a global budget per model from settings (about 1,000 RPM for `jev-1.13.0`, ADR-008) with per-org fair share. Limiter keys include the model. The 1,000 is about 83 percent of 1,200 RPM, the last per-model limit TypeSafe published. TypeSafe now sets limits per organization, in tokens per second and requests per second, so check the platform org's values in TypeSafe's developer console before setting budgets. How budgets follow per-organization limits waits on an ADR-008 amendment.
 - [ ] Audit writes inside `withTenant` for every mutation, with `actor_type`, `client`, `actor_token_id` and `approval_id`
 - [ ] Platform admin route group: org list, suspend, entitlement overrides, impersonation with banner
 

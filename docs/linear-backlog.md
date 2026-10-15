@@ -2117,6 +2117,7 @@ Acceptance criteria:
 - `POST /api/v1/sets/{ref}/try-model` builds a candidate spec (production with only the model changed), evals both on the same snapshot, re-tunes thresholds on the candidate's answers, and opens a `model_upgrade` proposal.
 - It never writes the set's draft. Only `proposal.accept` does.
 - It supports `?dryRun=true` and uses the eval limiter bucket.
+- On the `internal` dogfood sets, a try from `jev-1.13.0` to `jev-1.14.0` reproduces the manual D5 eval (`.claude/skills/bandwise-builder/references/phases/phase-d.md`) within its intervals.
 
 Refs: `.claude/skills/bandwise-builder/references/management-api.md#models`, `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`, `.claude/skills/bandwise-builder/references/system-one-models.md#11-new-model-upgrade-flow`
 
@@ -2134,6 +2135,8 @@ Acceptance criteria:
 - A live set is a candidate when it is pinned to an older model in the same family or to a model in the new model's `supersedes`, and the new model's `questionTypes` cover the set's question types. Candidates found only through `supersedes` are marked cross-family.
 
 Refs: `.claude/skills/bandwise-builder/references/system-one-models.md#6-detection`, `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`
+
+Note: Listing the `jev-1.13.0` dogfood sets as candidates for `jev-1.14.0` (the phase-3b.md acceptance case) needs registry data that orders the two, and `jev-1.13.0` has `releaseDate` null. Reading versions out of ids would be a name pattern match, and model facts come from the registry (golden rules 6 and 12). The open question is in `docs/PLAN.md` (Open items, Jev 1.14 decisions).
 
 #### P3b-21 Add eval deltas to model.upgrades and the model-upgrades report
 
@@ -5979,7 +5982,7 @@ The project, milestones, and labels already exist in NSIMS. Create the issues in
       ],
       "estimate": 5,
       "state": "Backlog",
-      "description": "Any set can be tried on a new model with evidence before anyone switches.\n\nAcceptance criteria:\n- `POST /api/v1/sets/{ref}/try-model` builds a candidate spec (production with only the model changed), evals both on the same snapshot, re-tunes thresholds on the candidate's answers, and opens a `model_upgrade` proposal.\n- It never writes the set's draft. Only `proposal.accept` does.\n- It supports `?dryRun=true` and uses the eval limiter bucket.\n\nRefs:\n- `.claude/skills/bandwise-builder/references/management-api.md#models`\n- `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`\n- `.claude/skills/bandwise-builder/references/system-one-models.md#11-new-model-upgrade-flow`\n\nNote: effectiveness-loop.md section 10 still says try-model clones production into a draft. management-api.md (it never writes the draft) wins; that wording fix is pending.\n\nLocal ID: P3b-19 (docs/linear-backlog.md)",
+      "description": "Any set can be tried on a new model with evidence before anyone switches.\n\nAcceptance criteria:\n- `POST /api/v1/sets/{ref}/try-model` builds a candidate spec (production with only the model changed), evals both on the same snapshot, re-tunes thresholds on the candidate's answers, and opens a `model_upgrade` proposal.\n- It never writes the set's draft. Only `proposal.accept` does.\n- It supports `?dryRun=true` and uses the eval limiter bucket.\n- On the `internal` dogfood sets, a try from `jev-1.13.0` to `jev-1.14.0` reproduces the manual D5 eval (`.claude/skills/bandwise-builder/references/phases/phase-d.md`) within its intervals.\n\nRefs:\n- `.claude/skills/bandwise-builder/references/management-api.md#models`\n- `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`\n- `.claude/skills/bandwise-builder/references/system-one-models.md#11-new-model-upgrade-flow`\n\nNote: effectiveness-loop.md section 10 still says try-model clones production into a draft. management-api.md (it never writes the draft) wins; that wording fix is pending.\n\nLocal ID: P3b-19 (docs/linear-backlog.md)",
       "blockedBy": [
         "P3b-02",
         "P3b-10",
@@ -6000,7 +6003,7 @@ The project, milestones, and labels already exist in NSIMS. Create the issues in
       ],
       "estimate": 3,
       "state": "Backlog",
-      "description": "Every set that could move to a new model is listed when that model is ready.\n\nAcceptance criteria:\n- Runs when a model becomes `stable` (or `preview` for orgs that allow preview models). It spends nothing.\n- A live set is a candidate when it is pinned to an older model in the same family or to a model in the new model's `supersedes`, and the new model's `questionTypes` cover the set's question types. Candidates found only through `supersedes` are marked cross-family.\n\nRefs:\n- `.claude/skills/bandwise-builder/references/system-one-models.md#6-detection`\n- `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`\n\nLocal ID: P3b-20 (docs/linear-backlog.md)",
+      "description": "Every set that could move to a new model is listed when that model is ready.\n\nAcceptance criteria:\n- Runs when a model becomes `stable` (or `preview` for orgs that allow preview models). It spends nothing.\n- A live set is a candidate when it is pinned to an older model in the same family or to a model in the new model's `supersedes`, and the new model's `questionTypes` cover the set's question types. Candidates found only through `supersedes` are marked cross-family.\n\nRefs:\n- `.claude/skills/bandwise-builder/references/system-one-models.md#6-detection`\n- `.claude/skills/bandwise-builder/references/effectiveness-loop.md#10-new-system-one-models-phase-3b`\n\nNote: Listing the `jev-1.13.0` dogfood sets as candidates for `jev-1.14.0` (the phase-3b.md acceptance case) needs registry data that orders the two, and `jev-1.13.0` has `releaseDate` null. Reading versions out of ids would be a name pattern match, and model facts come from the registry (golden rules 6 and 12). The open question is in `docs/PLAN.md` (Open items, Jev 1.14 decisions).\n\nLocal ID: P3b-20 (docs/linear-backlog.md)",
       "blockedBy": [
         "P1-20",
         "P3-43"

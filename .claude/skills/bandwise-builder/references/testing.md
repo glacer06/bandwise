@@ -54,6 +54,8 @@ Table-driven, 100% branch coverage required.
 | `jev` | moving |
 | `jev-1.13` | moving |
 | `jev-1.13.0` | pinned |
+| `jev-1.14` | moving |
+| `jev-1.14.0` | pinned (status `preview` does not change this) |
 | `foo-2.0.0` (unseen) | moving, and the registry sync inserts it as `unreviewed` |
 
 - Preflight uses the profile: a fake profile with a 16k state budget blocks a 20k state with `preflight_too_large`, and the `jev-1.13.0` profile lets the same state through.

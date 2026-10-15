@@ -320,7 +320,7 @@ describe("stages", () => {
   it("merges earlier answers into later state and records one call per stage; an alias is priced by the resolved model", async () => {
     const transport = scriptedTransport((req, n) => {
       const answers = n === 1 ? { team: teamAnswer("billing") } : { refund: { type: "noul", noul: 0.95 } };
-      return { model: n === 1 ? "jev-1.13.0" : "jev-1.14.0", answers, usage: { input_tokens: 100, output_tokens: 10 } } as unknown as SystemOneResponse;
+      return { model: n === 1 ? "jev-1.13.0" : "jev-1.15.0", answers, usage: { input_tokens: 100, output_tokens: 10 } } as unknown as SystemOneResponse;
     });
     const h = makePorts({ transport });
     const result = await runQuestionSet(ctx, runRequest({ ticket: "I was charged twice" }), resolvedRun(twoStage), h.ports, control());

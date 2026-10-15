@@ -1,6 +1,6 @@
 # System One API contract (what the wrapper relies on)
 
-Verified against docs.typesafe.ai and `https://api.typesafe.ai/openapi.json` (info.version 0.2.0) on 2026-09-26, with JS SDK `@typesafe-ai/sdk` 0.6.x. The OpenRouter route ([Routes](#routes)) was verified against OpenRouter's docs (`openrouter.ai/docs/guides/community/typesafe-sdk.md`, `.../jev.md`, the System One API reference) and its Models API on 2026-09-26. The live docs win if anything here drifts. Re-check `https://docs.typesafe.ai/api.md`, `/models.md` and `openapi.json` before changing anything in `packages/system-one-client`. Facts that differ per model (limits, question types, status, weaknesses, prices) are in [system-one-models.md](system-one-models.md).
+Verified against docs.typesafe.ai and `https://api.typesafe.ai/openapi.json` (info.version 0.2.0) on 2026-09-26, with JS SDK `@typesafe-ai/sdk` 0.6.x. The OpenRouter route ([Routes](#routes)) was verified against OpenRouter's docs (`openrouter.ai/docs/guides/community/typesafe-sdk.md`, `.../jev.md`, the System One API reference) and its Models API on 2026-09-26. Re-checked on 2026-10-15 for Jev 1.14 against `/models.md`, `openapi.json` and the JS and Python SDK changelogs: `openapi.json` still says info.version 0.2.0 but changed in place, and Bandwise stays on JS SDK 0.6.x (see [Watch](#watch)). TypeSafe's Jev 1.14 blog post could not be read that day, so nothing here rests on it. The live docs win if anything here drifts. Re-check `https://docs.typesafe.ai/api.md`, `/models.md` and `openapi.json` before changing anything in `packages/system-one-client`. Facts that differ per model (limits, question types, status, weaknesses, prices) are in [system-one-models.md](system-one-models.md).
 
 ## Endpoint
 
@@ -75,14 +75,18 @@ These hold for every model. They are constants in `packages/core`.
 |---|---|
 | Options per choice | At most 255 |
 | Score levels | 2 to 10 |
-| Question types | `noul`, `choice`, `score`. The OpenAPI `Question` is a `oneOf` discriminated on `type`. |
+| Question types | `noul`, `choice`, `score`. The OpenAPI `Question` is a `oneOf` discriminated on `type`. The live OpenAPI also lists `box`, which Bandwise has not adopted ([Watch](#watch)). |
 | State shapes | String, JSON object, or array |
 
 ### Per-model limits
 
-Context per request, the state plus longest question budget, requests per minute, tokens per second, input modalities and language strength differ by model. They live in the `ModelProfile` ([system-one-models.md](system-one-models.md)), which preflight, lints and default limiter budgets read. The `jev-1.13.0` values are in its seed table.
+Context per request, the state plus longest question budget, input modalities and language strength differ by model. They live in the `ModelProfile` ([system-one-models.md](system-one-models.md)), which preflight, lints and default limiter budgets read. The `jev-1.13.0` and `jev-1.14.0` values are in its seed table. Both have 64,000 tokens per request and 32,000 for state plus the longest question.
 
-Bandwise reserves headroom: the global budget is a per-model setting (about 1,000 requests per minute for `jev-1.13.0`, against a published 1,200), limiter keys include the model, and evals use a separate bucket ([security.md](security.md)).
+TypeSafe's `TypeSafe-Danger-Zone-Long-Context: true` header raises both limits to 262k tokens on Jev 1.13 and 1.14, at the same price but slower and less accurate (`models.md`, 2026-10-15). Bandwise does not send it, and preflight checks the default limits. Adopting it needs an ADR.
+
+Rate limits are no longer published per model. On 2026-10-15 `models.md` says they are set per organization in TypeSafe's developer console, measured in tokens per second and requests per second, and a request over either gets `429`. The profile still carries `rpm` and `tokensPerSec`, holding the last per-model values TypeSafe published (1,200 and 250,000, for `jev-1.13.0`).
+
+Bandwise reserves headroom: the global budget is a per-model setting (about 1,000 requests per minute for `jev-1.13.0`, about 83 percent of that last published 1,200), limiter keys include the model, and evals use a separate bucket ([security.md](security.md)). The budget must also fit the platform key's own per-organization limits.
 
 ## Errors
 
@@ -204,7 +208,7 @@ system_one_cost_usd = input_tokens * price.in + output_tokens * price.out
 ```
 
 - `price.in` and `price.out` are USD per token. `price_books` stores them as micro-USD per million tokens (`input_per_mtok_micro_usd`, `output_per_mtok_micro_usd`), keyed by the exact versioned ID. Alias rows are rejected. Runs store the result as integer `runs.system_one_cost_micro_usd` ([data-model.md](data-model.md)).
-- The Jev 1.13 row: $0.042 per million input tokens and $0 per million output tokens. TypeSafe says output tokens are currently free, so the output price is data, not an assumption.
+- The Jev 1.13 and Jev 1.14 rows (`jev-1.13.0`, `jev-1.14.0`): $0.042 per million input tokens and $0 per million output tokens each (`models.md`, 2026-10-15: $42 per Btok). TypeSafe says output tokens are currently free, so the output price is data, not an assumption.
 - Unpriced models, and what happens to their runs, are in [system-one-models.md](system-one-models.md), pricing.
 
 ## Data handling
@@ -225,8 +229,8 @@ Bandwise calls System One server-side through `SystemOneTransport`: the SDK tran
 | Response `model` | TypeSafe versioned id, `jev-1.13.0` | OpenRouter id with a build date, `typesafe/jev-1.13-20260917` |
 | Extra response fields | none | `id`, `provider` (`"TypeSafe"`), `usage.cost` in USD |
 | Request id | `x-typesafe-request-id` header | response `id` when the header is absent |
-| Context | 64,000 tokens per request, 32,000 for state plus the longest question (jev-1.13.0) | 32,000 tokens for state plus all questions (OpenRouter's listing) |
-| Price (Jev 1.13) | $0.042 per million input tokens, output free | $0.042 per million input tokens, $0 output (OpenRouter's listing); `usage.cost` is the actual charge |
+| Context | 64,000 tokens per request, 32,000 for state plus the longest question (jev-1.13.0 and jev-1.14.0) | 32,000 tokens for state plus all questions (OpenRouter's listing) |
+| Price (Jev 1.13 and 1.14) | $0.042 per million input tokens, output free | Jev 1.13: $0.042 per million input tokens, $0 output (OpenRouter's listing). No Jev 1.14 route. `usage.cost` is the actual charge |
 | Model listing | `GET /v1/models`, `client.models.list()` | OpenRouter's Models API, `GET https://openrouter.ai/api/v1/models` (entries `typesafe/*` and `~typesafe/*`). `client.models.list()` does not work here |
 
 - **Id mapping.** OpenRouter maps bare TypeSafe ids itself: `jev-1.13` becomes `typesafe/jev-1.13`, `jev-latest` becomes `~typesafe/jev-latest`, and an id that already has an author prefix is used as is. Bandwise does not rely on that. It sends the id from the route row (`ModelRoute.providerModelId`), because OpenRouter has no `typesafe/jev-1.13.0`. `toOpenRouterModelId` and `fromOpenRouterModelId` in core mirror OpenRouter's rule for defaults and display. `registryIdForResolved` maps a response `model` back to a registry id through the route rows, for pricing and pinning ([system-one-models.md](system-one-models.md), section 15).
@@ -265,8 +269,18 @@ TypeSafe's SDKs and API are pre-1.0 and changing weekly.
 
 - JS SDK 0.6.0 (2026-09-15) had a breaking change: `Score.criteria` became an ordered sequence instead of a dictionary keyed by integers. Python 0.6.0 made the same change.
 - Python SDK 0.7.0 (2026-09-18) moved from msgspec to pydantic.
+- JS SDK 0.7.0 (2026-10-14) is not adopted. The catalog pin stays `^0.6.0`, and the upgrade is its own PR. What it changes:
+  - It requires Node.js 22 or newer. The "Node 20+" line above describes 0.6.x.
+  - It stops exporting request payload types. The one removed name is `SystemOneRequestPayload`, which Bandwise does not import.
+  - It types `SystemOneRequest.state` as `NonNullable<EntryType>`, so the `state` cast in `sdk-transport.ts` fails typecheck until it changes.
+  - It compresses request bodies of 1 KiB or more with zstd on Node.js 22.15 or newer, unless the client passes `compression: false`. Every provider goes through the SDK client, and the OpenRouter and Vercel routes (ADR-011, ADR-013) were checked only with 0.6.x, which does not compress. The upgrade decides `compression` per provider.
+  - It adds experimental images behind the `TypeSafe-Danger-Zone-Images: true` header, and `box` questions for `jev-preview`.
+  - It allows null usage token counts, adds more request validation checks, and rejects the returned promise for an invalid request instead of throwing.
+  - It fixes an unhandled rejection on Node.js 22 when a request times out or is aborted mid-body.
+- Python SDK 0.7.5 (2026-10-14) turns on zstd request compression by default, and TypeSafe notes that non-official APIs may not support it yet. It also adds `Image` assets and `Box` questions. Only generated Python code uses this SDK (Python SDK usage, above).
+- `openapi.json` changed in place at info.version 0.2.0, seen on 2026-10-15. `box` is in the `Question` and `Answer` discriminators. New schemas: `Asset`, `BoxQuestion`, `BoxAnswer` and `BoxCoordinates`. `SystemOneRequest` gained an optional `assets`. `POST /v1/systemone` gained the `TypeSafe-Danger-Zone-Images` and `TypeSafe-Danger-Zone-Long-Context` header parameters. None of this is adopted, and the committed `openapi.json` snapshot stays as it was until an ADR decides on `box` and images, so the contract watch keeps flagging the change. The fixtures' version check cannot see a change like this, because the version did not move.
 - The official skill links a v1 migration guide (`docs.typesafe.ai/migrating-to-v1.md`) that returns 404 today.
-- The nightly contract watch job diffs `openapi.json`, `llms.txt` and `models.md` against snapshots committed in `packages/system-one-client`, and alerts on a change ([system-one-models.md](system-one-models.md), detection). Fixtures record the `openapi.json` version they were made against ([testing.md](testing.md)).
+- The contract watch job diffs `openapi.json`, `llms.txt` and `models.md` against snapshots committed in `packages/system-one-client`, and alerts on a change ([system-one-models.md](system-one-models.md), detection). It is a plain function today: its nightly schedule lands with the Phase 2 job runner (ADR-005). Fixtures record the `openapi.json` version they were made against ([testing.md](testing.md)).
 
 ## Latency and outages (TypeSafe published figures)
 

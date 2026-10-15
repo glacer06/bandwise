@@ -27,7 +27,7 @@ To re-record later, from your shell with `TYPESAFE_API_KEY` set:
 
 ```sh
 pnpm fixtures:record          # rewrites the recorded success fixtures in packages/system-one-client/fixtures/typesafe
-pnpm smoke                    # checks jev-preview, jev-latest and jev-1.13.0; prints cost per model
+pnpm smoke                    # checks jev-preview, jev-latest and every preview or stable registry model (jev-1.13.0, jev-1.14.0); prints cost per model
 git diff --stat packages/system-one-client/fixtures
 ```
 
@@ -38,6 +38,41 @@ The three dogfood hooks are wired in this repo's `.claude/settings.json`, all in
 ## Hosted mode (D2e)
 
 To move the hooks from your own key to app.bandwise.dev, follow [hosted-dogfood.md](hosted-dogfood.md) in order: migrations, the Vercel env, `bootstrap-internal` for the `internal` org and the `.bandwise/sets/` specs, the minted tokens, the checks, and the rollback plan. It marks which steps need PJ. Hosted mode went live on 2026-10-05: the hooks on this repo call app.bandwise.dev with the run-only hook token, every set still in `shadow`.
+
+## Jev 1.14 (D5)
+
+TypeSafe made `jev-1.14.0` available on 2026-10-14 and points `jev-preview` at it. `jev-latest` still points to `jev-1.13.0`, so Bandwise treats 1.14 as a preview model, and every set here stays on `jev-1.13.0` until Nick repins it. The plan is in `docs/PLAN.md`, Jev 1.14, and the checklist is D5 in phase-d.md. Nothing below changes what the hooks run, and nothing below writes to `.bandwise/sets/`.
+
+The `jev-1.14.0` registry row and price were added on 2026-10-15. Once that change is on `main`, run these from your shell with `TYPESAFE_API_KEY` set:
+
+```sh
+pnpm fixtures:record --model jev-1.14.0
+pnpm smoke
+pnpm smoke --model jev-1.14.0
+```
+
+The first writes `packages/system-one-client/fixtures/typesafe/jev-1.14.0/`. The second should show `jev-preview` answered by `jev-1.14.0`. Commit the fixtures, and write the cost and latency here.
+
+To see one set's own states on 1.14, run a copy of its spec from `/tmp`. The file the hooks read stays on 1.13, the receipts go to their own file, and every run passes `--rollout shadow`. Without it `bandwise run --live` runs at `full`, and the receipts would record a full stage on a preview model:
+
+```sh
+jq '.model = "jev-1.14.0"' .bandwise/sets/model-tier.json > /tmp/model-tier-1.14.json
+for s in .bandwise/states/model-tier/*.json; do pnpm -s bandwise run --live /tmp/model-tier-1.14.json "$s" --rollout shadow --receipts=$HOME/.bandwise/receipts-1.14.jsonl; done
+pnpm bandwise report --since 1d --receipts ~/.bandwise/receipts-1.14.jsonl
+```
+
+Never put a 1.14 copy in `.bandwise/sets/`. CI expects exactly the agent pack there (`packages/cli/src/local/dogfood-sets.test.ts`), and `bootstrap-internal` would import it.
+
+For the eval, keep the sets and the labeled datasets in `~/.bandwise/evals/internal/`, never in the repo, because real states hold your prompts. Copy each spec to `sets/<set>/v1.json` there as it is, on `jev-1.13.0`. Write the cases to `datasets/<set>.jsonl`, one JSON object per line with `id`, `state` and `expected`, where `expected` maps each decision id to the answer you label. Start from the example and borderline states in `.bandwise/states/<set>/`, add real states from `/runs` where the run kept its state, and set or confirm every label yourself. Run 1.13 first, then 1.14 on the snapshot id the first run prints:
+
+```sh
+pnpm eval --org internal --set model-tier --version 1 --dataset model-tier --transport sdk --data ~/.bandwise/evals --repeats 3
+pnpm eval --org internal --set model-tier --version 1 --dataset model-tier --transport sdk --data ~/.bandwise/evals --repeats 3 --snapshot <id> --model jev-1.14.0
+```
+
+Do the same for `done-check`, `action-risk-gate` and `launch-profile`. The snapshots and eval records land in the same folder, outside the repo. If a threshold needs to move for 1.14, put it in a new version file there (`sets/<set>/v2.json` with `"model": "jev-1.14.0"`), not in `.bandwise/sets/`.
+
+Write the aggregate numbers here (precision and lower bound per band, coverage, review load, ECE, stability), never the cases. With 50 or so labeled cases per set the intervals are wide, so read a small difference as no difference.
 
 ## 1. Install
 

@@ -1,8 +1,9 @@
-// Seed rows for the System One model registry (`system_one_models`) and its price book row.
+// Seed rows for the System One model registry (`system_one_models`) and its price book rows.
 // Source: references/system-one-models.md section 13 (seed table), section 14 (default model) and
 // references/system-one-api-contract.md (Limits, Pricing). Facts checked against docs.typesafe.ai
-// and openapi.json 0.2.0 on 2026-09-26. The live docs win: when they change, update this file and
-// the seed table in the same PR (system-one-models.md section 12).
+// and openapi.json 0.2.0 on 2026-09-26. The jev-1.14.0 row, its price and the jev-preview target
+// were checked against docs.typesafe.ai/models.md on 2026-10-15. The live docs win: when they
+// change, update this file and the seed table in the same PR (system-one-models.md section 12).
 //
 // Tests and the table seed read these rows. Runtime code reads profiles through the ModelCatalog
 // port, never from this file. Catalog data may say Jev; code identifiers stay neutral.
@@ -17,10 +18,11 @@ import {
 import type { ModelPrice } from "../contracts/ports.js";
 
 const DOCS_URL = "https://docs.typesafe.ai/models.md";
-const LAST_REVIEWED = "2026-09-26";
+const REVIEWED_2026_09_26 = "2026-09-26";
+const REVIEWED_2026_10_15 = "2026-10-15";
 
-/** jev-1.13.0: the only versioned row, so the only pinned one. */
-const VERSIONED_ROW: ModelProfileInput = {
+/** jev-1.13.0: stable, the platform default, and jev-latest's target. */
+const ROW_1_13_0: ModelProfileInput = {
   id: "jev-1.13.0",
   family: "jev",
   kind: "versioned",
@@ -33,6 +35,8 @@ const VERSIONED_ROW: ModelProfileInput = {
   limits: {
     requestTokens: 64_000,
     statePlusLongestQuestionTokens: 32_000,
+    // Published per model when checked on 2026-09-26. On 2026-10-15 models.md no longer lists them
+    // (see ROW_1_14_0).
     rpm: 1_200,
     tokensPerSec: 250_000,
   },
@@ -42,7 +46,46 @@ const VERSIONED_ROW: ModelProfileInput = {
   supersedes: [],
   docsUrl: DOCS_URL,
   jaggednessUrl: "https://docs.typesafe.ai/model-jaggedness/jev-1.13.md",
-  lastReviewed: LAST_REVIEWED,
+  lastReviewed: REVIEWED_2026_09_26,
+};
+
+/**
+ * jev-1.14.0: available from 2026-10-14 (models.md on 2026-10-15). TypeSafe points jev-preview at it
+ * and keeps jev-latest, "the most recent stable, official release", on jev-1.13.0. models.md lists
+ * it under Current models as the newest Jev release and never calls it a preview build. Status
+ * preview is our reading of the alias table; revisit it when TypeSafe moves jev-latest. Same price,
+ * context limits and text input as jev-1.13.0.
+ */
+const ROW_1_14_0: ModelProfileInput = {
+  id: "jev-1.14.0",
+  family: "jev",
+  kind: "versioned",
+  aliasTarget: null,
+  status: "preview",
+  releaseDate: "2026-10-14",
+  retireAt: null,
+  // Box questions and image input are in the live openapi.json and SDK 0.7.0 but not adopted
+  // (the question type list is closed, ADR-008 section 5), so the row lists the adopted types only.
+  questionTypes: ["noul", "choice", "score"],
+  limits: {
+    requestTokens: 64_000,
+    statePlusLongestQuestionTokens: 32_000,
+    // models.md now sets rate limits per organization, in tokens and requests per second, and no
+    // longer publishes them per model. These repeat jev-1.13.0's last published values because the
+    // contract needs positive integers. How to store them waits on an ADR-008 amendment, listed in
+    // docs/PLAN.md Open items and not yet written.
+    rpm: 1_200,
+    tokensPerSec: 250_000,
+  },
+  inputModalities: ["text"],
+  // No jaggedness page exists for 1.14 yet (model-jaggedness/jev-1.14.md is a 404 on 2026-10-15).
+  // The jev-1.13 weakness ids stay listed so the weakness lints keep firing. An empty list would
+  // claim 1.14 fixed them, and nobody knows that yet.
+  weaknesses: [...KNOWN_WEAKNESS_IDS],
+  supersedes: [],
+  docsUrl: DOCS_URL,
+  jaggednessUrl: null,
+  lastReviewed: REVIEWED_2026_10_15,
 };
 
 /**
@@ -50,7 +93,7 @@ const VERSIONED_ROW: ModelProfileInput = {
  * valid rows with non-null limits. ModelCatalog never uses them for a moving name; it uses the
  * profile of the observed target.
  */
-function aliasOf(id: string, status: "stable" | "preview", target: ModelProfileInput): ModelProfileInput {
+function aliasOf(id: string, status: "stable" | "preview", target: ModelProfileInput, lastReviewed: string = REVIEWED_2026_09_26): ModelProfileInput {
   return {
     id,
     family: target.family,
@@ -66,15 +109,18 @@ function aliasOf(id: string, status: "stable" | "preview", target: ModelProfileI
     supersedes: [],
     docsUrl: DOCS_URL,
     jaggednessUrl: null,
-    lastReviewed: LAST_REVIEWED,
+    lastReviewed,
   };
 }
 
 const SEED_INPUT: readonly ModelProfileInput[] = [
-  VERSIONED_ROW,
-  aliasOf("jev-latest", "stable", VERSIONED_ROW),
-  // TypeSafe says jev-preview moves ahead of jev-latest when a preview build exists. None exists today.
-  aliasOf("jev-preview", "preview", VERSIONED_ROW),
+  ROW_1_13_0,
+  aliasOf("jev-latest", "stable", ROW_1_13_0),
+  // jev-preview moves ahead of jev-latest when a preview build exists. On 2026-10-15 models.md
+  // points it at jev-1.14.0 while jev-latest stays on jev-1.13.0.
+  aliasOf("jev-preview", "preview", ROW_1_14_0, REVIEWED_2026_10_15),
+  // Appended, not inserted: tests read rows 0 and 1 as jev-1.13.0 and jev-latest.
+  ROW_1_14_0,
 ];
 
 /** Seed ModelProfile rows, parsed at load so a bad edit fails loudly. */
@@ -108,7 +154,7 @@ const SEED_ROUTE_INPUT: readonly ModelRouteInput[] = [
     resolvedIds: ["typesafe/jev-1.13-20260917"],
     limits: { ...OPENROUTER_LIMITS },
     docsUrl: "https://openrouter.ai/typesafe/jev-1.13",
-    lastReviewed: LAST_REVIEWED,
+    lastReviewed: REVIEWED_2026_09_26,
   },
   {
     modelId: "jev-latest",
@@ -119,7 +165,7 @@ const SEED_ROUTE_INPUT: readonly ModelRouteInput[] = [
     resolvedIds: [],
     limits: { ...OPENROUTER_LIMITS },
     docsUrl: "https://openrouter.ai/typesafe",
-    lastReviewed: LAST_REVIEWED,
+    lastReviewed: REVIEWED_2026_09_26,
   },
   // Vercel AI Gateway (ADR-013), checked on 2026-09-27 against Vercel's "TypeSafe API with AI
   // Gateway" page. It documents one id, `typesafe-ai/jev`, and no versioned id, so jev-1.13.0 has
@@ -153,10 +199,12 @@ export interface SeedModelPrice extends ModelPrice {
 /**
  * Platform price rows. Prices are not part of a ModelProfile (ADR-008 section 6). jev-1.13.0 costs
  * $0.042 per million input tokens (42,000 micro-USD) and output is currently free; the zero is
- * data, not an assumption.
+ * data, not an assumption. jev-1.14.0 has the same price (models.md on 2026-10-15: $42 per Btok,
+ * output free).
  */
 export const SEED_SYSTEM_ONE_PRICES: readonly SeedModelPrice[] = Object.freeze([
   { model: "jev-1.13.0", inputPerMtokMicroUsd: 42_000, outputPerMtokMicroUsd: 0 },
+  { model: "jev-1.14.0", inputPerMtokMicroUsd: 42_000, outputPerMtokMicroUsd: 0 },
 ]);
 
 /**

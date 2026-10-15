@@ -31,11 +31,13 @@ describe("pnpm smoke", () => {
   });
 
   it("builds the smoke list from the registry", () => {
-    expect(smokeList("typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES).map((t) => t.model)).toEqual(["jev-preview", "jev-latest", "jev-1.13.0"]);
+    expect(smokeList("typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES).map((t) => t.model)).toEqual(["jev-preview", "jev-latest", "jev-1.13.0", "jev-1.14.0"]);
     expect(smokeList("openrouter", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES)).toEqual([
       { model: "jev-preview", sendAs: null },
       { model: "jev-latest", sendAs: "~typesafe/jev-latest" },
       { model: "jev-1.13.0", sendAs: "typesafe/jev-1.13" },
+      // No OpenRouter route row for jev-1.14.0.
+      { model: "jev-1.14.0", sendAs: null },
     ]);
     expect(smokeList("typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, { model: "jev-1.13.0", pinnedInUse: ["x"] })).toEqual([{ model: "jev-1.13.0", sendAs: "jev-1.13.0" }]);
     expect(smokeList("typesafe", SEED_MODEL_PROFILES, SEED_MODEL_ROUTES, { pinnedInUse: ["jev-1.12.0"] }).map((t) => t.model)).toContain("jev-1.12.0");
@@ -46,8 +48,11 @@ describe("pnpm smoke", () => {
     expect(await smokeMain([], t.io)).toBe(0);
     const lines = t.out.join("\n");
     expect(lines).toContain("ok   jev-latest noul.versioned_model: answered by jev-1.13.0");
+    // jev-preview's seed target is jev-1.14.0, which has a registry row and a price row.
+    expect(lines).toContain("ok   jev-preview noul.versioned_model: answered by jev-1.14.0");
     expect(lines).toContain("ok   jev-1.13.0 two_stage.run: status ok, calls per stage 1+1");
     expect(lines).toMatch(/ok {3}jev-1\.13\.0 cost: \$0\.0000\d\d/);
+    expect(lines).toMatch(/ok {3}jev-1\.14\.0 cost: \$0\.0000\d\d/);
     expect(lines).toContain("smoke passed");
   });
 
@@ -69,6 +74,7 @@ describe("pnpm smoke", () => {
       { model: "jev-preview", sendAs: null },
       { model: "jev-latest", sendAs: "typesafe-ai/jev" },
       { model: "jev-1.13.0", sendAs: null },
+      { model: "jev-1.14.0", sendAs: null },
     ]);
     // Synthetic answers carry no cost; AI Gateway reports one in provider_metadata.gateway.cost.
     const offline = offlineTransport();
@@ -81,7 +87,7 @@ describe("pnpm smoke", () => {
     const t = io({ AI_GATEWAY_API_KEY: "vck-test" }, { transport: withGatewayCost });
     expect(await smokeMain(["--provider", "vercel"], t.io)).toBe(0);
     const lines = t.out.join("\n");
-    expect(lines).toContain("smoke on vercel: jev-preview, jev-latest, jev-1.13.0");
+    expect(lines).toContain("smoke on vercel: jev-preview, jev-latest, jev-1.13.0, jev-1.14.0");
     expect(lines).toContain("SKIP jev-1.13.0 route: skipped: no vercel route row for jev-1.13.0");
     expect(lines).toContain("SKIP jev-latest noul.versioned_model: answered by typesafe-ai/jev; Vercel documents no versioned id");
     expect(lines).toContain("ok   jev-latest two_stage.run: status ok");
