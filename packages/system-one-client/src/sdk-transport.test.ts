@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { type SystemOneCallOptions, type SystemOneRequest, TransportError, isTransportError } from "@bandwise/core";
 import { APIConnectionError, TypeSafeError } from "@typesafe-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { SDK_LOG_LEVEL, SdkTransport, createSdkClient, mapSdkError } from "./sdk-transport.js";
+import { SDK_COMPRESSION, SDK_LOG_LEVEL, SdkTransport, createSdkClient, mapSdkError } from "./sdk-transport.js";
 
 const request: SystemOneRequest = {
   state: { ticket: "Charged twice" },
@@ -46,6 +46,15 @@ describe("SdkTransport success path", () => {
     expect(seen[0]?.url).toBe("https://api.typesafe.ai/v1/systemone");
     expect(seen[0]?.headers["authorization"]).toBe("Bearer ts_key_1");
     expect(seen[0]?.body).toEqual(request);
+  });
+
+  it("sends a body over 1 KiB as plain JSON with no Content-Encoding (SDK_COMPRESSION)", async () => {
+    const seen: Seen[] = [];
+    const big: SystemOneRequest = { ...request, state: { ticket: "Charged twice. ".repeat(300) } };
+    const t = new SdkTransport({ fetch: fakeFetch(200, okBody, {}, seen) });
+    await t.call(big, opts());
+    expect(seen[0]?.headers["content-encoding"]).toBeUndefined();
+    expect(seen[0]?.body).toEqual(big);
   });
 
   it("sends to OpenRouter's base URL and takes the request id from the response id", async () => {
@@ -146,6 +155,11 @@ describe("SDK client construction", () => {
     }
   });
 
+  it.each(["typesafe", "openrouter", "vercel"] as const)("turns request compression off on %s", (provider) => {
+    expect(SDK_COMPRESSION).toBe(false);
+    expect(createSdkClient(provider, "key", "jev-1.13.0").compression).toBe(false);
+  });
+
   it("builds TypeSafeClient in exactly one place, always with logLevel", () => {
     const dir = fileURLToPath(new URL("./", import.meta.url));
     const sources = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
@@ -156,6 +170,7 @@ describe("SDK client construction", () => {
     expect(sites.map((s) => s.f)).toEqual(["sdk-transport.ts"]);
     expect(sites[0]?.text).toMatch(/logLevel: SDK_LOG_LEVEL/);
     expect(sites[0]?.text).toMatch(/baseURL: SYSTEM_ONE_PROVIDER_BASE_URLS\[provider\]/);
+    expect(sites[0]?.text).toMatch(/compression: SDK_COMPRESSION/);
     expect(sites[0]?.text).not.toMatch(/dangerouslyAllowBrowser: true/);
   });
 });
@@ -223,6 +238,23 @@ describe("error mapping", () => {
     const t = new SdkTransport({ fetch: fakeFetch(200, okBody) });
     const err = await t.call({ ...request, questions: {} }, opts()).catch((e: unknown) => e);
     expect(err).toMatchObject({ code: "system_one_invalid_request" });
+  });
+
+  it("a null state is rejected before sending as system_one_invalid_request (SDK 0.7)", async () => {
+    const seen: Seen[] = [];
+    const t = new SdkTransport({ fetch: fakeFetch(200, okBody, {}, seen) });
+    const err = await t.call({ ...request, state: null }, opts()).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "system_one_invalid_request", retryable: false });
+    expect(seen).toHaveLength(0);
+  });
+
+  it("a state holding a literal SDK image reference is rejected before sending (SDK 0.7)", async () => {
+    const seen: Seen[] = [];
+    const t = new SdkTransport({ fetch: fakeFetch(200, okBody, {}, seen) });
+    const state = { ticket: `see <image:${"a".repeat(32)}> attached` };
+    const err = await t.call({ ...request, state }, opts()).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "system_one_invalid_request", retryable: false });
+    expect(seen).toHaveLength(0);
   });
 
   it("mapSdkError passes TransportErrors through and maps the rest", () => {

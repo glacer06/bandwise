@@ -4,6 +4,7 @@
 // Every client is built with an explicit baseURL (from core's SYSTEM_ONE_PROVIDER_BASE_URLS, never
 // env), defaultModel, logLevel "warn" and the scrubbing logger, so TYPESAFE_BASE_URL,
 // TYPESAFE_DEFAULT_MODEL and TYPESAFE_LOG_LEVEL can never steer tenant traffic or log its bodies.
+// Compression is explicit too: off on every provider (SDK_COMPRESSION).
 // Retries belong to the SDK: each call passes its timeout and retry budget; there is no second loop.
 //
 // The request body is built field by field from SystemOneRequest (state, model, questions), so no
@@ -15,6 +16,7 @@ import {
   APIConnectionError,
   APIError,
   APIUserAbortError,
+  type Compression,
   type EntryType,
   type Questions,
   TypeSafeClient,
@@ -41,6 +43,15 @@ import { type LogSink, createScrubbingLogger } from "./logger.js";
 /** The log level every SDK client gets. `debug` would log request bodies unredacted. */
 export const SDK_LOG_LEVEL = "warn" as const;
 
+/**
+ * Request body compression for every SDK client. SDK 0.7 defaults to zstd on Node 22.15 or newer,
+ * so the default would differ between runtimes, and the OpenRouter and Vercel routes (ADR-011,
+ * ADR-013) were only ever checked with plain bodies. Off everywhere keeps the wire what it was on
+ * SDK 0.6. Turning it on for a provider needs a live smoke on that provider first, and for
+ * OpenRouter or Vercel an amendment to its ADR.
+ */
+export const SDK_COMPRESSION: Compression = false;
+
 export interface SdkTransportOptions {
   /** Where the scrubbing logger writes. Default: console. */
   logSink?: LogSink;
@@ -63,6 +74,7 @@ export function createSdkClient(
     defaultModel,
     logLevel: SDK_LOG_LEVEL,
     logger: createScrubbingLogger(options.logSink),
+    compression: SDK_COMPRESSION,
     dangerouslyAllowBrowser: false,
   };
   if (options.fetch !== undefined) config.fetch = options.fetch;
@@ -84,7 +96,7 @@ export function mapSdkError(e: unknown, provider: SystemOneProvider): TransportE
   }
   if (e instanceof APIError) return transportErrorForStatus(e.status, provider, e.requestId ?? null);
   if (e instanceof TypeSafeError) {
-    // Raised before sending, for example empty questions: a compiler bug.
+    // Raised before sending, for example empty questions or a null state: a compiler bug.
     return new TransportError({ code: "system_one_invalid_request", retryable: false, requestId: null }, "the SDK rejected the request before sending it");
   }
   return new TransportError(
@@ -117,7 +129,7 @@ export class SdkTransport implements SystemOneTransport {
     try {
       const { data, requestId, response } = await client
         .systemOne(
-          { state: req.state as EntryType, model: req.model, questions: req.questions as unknown as Questions },
+          { state: req.state as NonNullable<EntryType>, model: req.model, questions: req.questions as unknown as Questions },
           { timeout: opts.timeoutMs, retry: { maxRetries: opts.retry.maxRetries, maxRetryAfterMs: opts.retry.maxRetryAfterMs }, signal: opts.signal },
         )
         .withResponse();
