@@ -6,7 +6,7 @@
 - No `any`. Use `unknown` and narrow with zod.
 - zod at every boundary: HTTP input, DB JSON columns, System One responses, env, plugin config.
 - Types come from zod (`z.infer`), not the other way around.
-- Node 22.13+ for the dev toolchain (the root `engines` field): vitest 5 needs ^22.12 and ESLint 10 needs ^22.13 within Node 22. Node 20+ stays the runtime floor for code that only runs the TypeSafe SDK, such as a standalone export in a customer app.
+- Node 22.13+ for the dev toolchain (the root `engines` field): vitest 5 needs ^22.12 and ESLint 10 needs ^22.13 within Node 22. Node 22+ is also the floor for code that only runs the TypeSafe SDK, such as a standalone export in a customer app, because SDK 0.7.0 requires it.
 
 ## zod
 

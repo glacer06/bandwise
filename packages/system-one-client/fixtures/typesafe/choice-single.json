@@ -32,8 +32,8 @@
         "type": "choice",
         "choice": "billing",
         "probabilities": {
-          "technical": 0,
           "billing": 1,
+          "technical": 0,
           "account": 0,
           "none_of_these": 0
         },

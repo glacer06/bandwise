@@ -32,9 +32,9 @@
         "type": "choice",
         "choice": "none_of_these",
         "probabilities": {
-          "account": 0,
           "billing": 0,
           "technical": 0,
+          "account": 0,
           "none_of_these": 1
         },
         "confidence": 1
