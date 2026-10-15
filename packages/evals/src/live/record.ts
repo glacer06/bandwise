@@ -4,8 +4,9 @@
 // answer back in the same file. Error fixtures (401, 402, 422, 429, 529) stay hand-authored: a live
 // key cannot produce them on demand. With --model, the same requests go to that model (through its
 // route row off TypeSafe) and land in fixtures/<provider>/<model>/, so the same questions on two
-// models are two fixtures. Request and generation ids are scrubbed, and each fixture records
-// TypeSafe's live openapi.json info.version.
+// models are two fixtures. Only the provider folder's own fixtures are sources: a model folder holds
+// the same names, so reading it too would write one model's answers over another's. Request and
+// generation ids are scrubbed, and each fixture records TypeSafe's live openapi.json info.version.
 
 import { join } from "node:path";
 import { type ModelProfile, type ModelRoute, type SystemOneProvider, type SystemOneRequest, type SystemOneTransport, isTransportError, resolveRoute } from "@bandwise/core";
@@ -22,7 +23,10 @@ export class RecordPlanError extends Error {
   override readonly name = "RecordPlanError";
 }
 
-/** Which requests to send and where each answer goes. */
+/**
+ * Which requests to send and where each answer goes. `fixtures` are the provider folder's own
+ * fixtures (loadProviderFixtures), not its model folders; two sources for one path are refused.
+ */
 export function planRecording(
   fixtures: readonly Fixture[],
   provider: SystemOneProvider,
@@ -41,7 +45,7 @@ export function planRecording(
       evaluationFallbackReason(f.response, f.responseHeaders) === null,
   );
   if (model === undefined) {
-    return sources.map((f) => ({ name: f.name, path: join(provider, `${f.name}.json`), request: f.request }));
+    return oneSourcePerPath(sources.map((f) => ({ name: f.name, path: join(provider, `${f.name}.json`), request: f.request })));
   }
   let sendAs = model;
   if (provider !== "typesafe") {
@@ -51,9 +55,21 @@ export function planRecording(
     sendAs = route.providerModelId;
   }
   // Alias fixtures exist to show an alias answered by a build; they are recorded only without --model.
-  return sources
-    .filter((f) => !f.name.startsWith("alias-"))
-    .map((f) => ({ name: f.name, path: join(provider, model, `${f.name}.json`), request: { ...f.request, model: sendAs } }));
+  return oneSourcePerPath(
+    sources
+      .filter((f) => !f.name.startsWith("alias-"))
+      .map((f) => ({ name: f.name, path: join(provider, model, `${f.name}.json`), request: { ...f.request, model: sendAs } })),
+  );
+}
+
+/** Refuse a plan that writes one path twice: the second answer would silently replace the first. */
+function oneSourcePerPath(targets: RecordTarget[]): RecordTarget[] {
+  const seen = new Set<string>();
+  for (const t of targets) {
+    if (seen.has(t.path)) throw new RecordPlanError(`two fixtures would be written to ${t.path}; record from the provider folder's own fixtures, not its model folders`);
+    seen.add(t.path);
+  }
+  return targets;
 }
 
 /** Remove request and generation ids so fixtures carry no live identifiers. */

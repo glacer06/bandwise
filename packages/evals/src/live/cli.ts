@@ -14,7 +14,7 @@ import {
   type SystemOneTransport,
 } from "@bandwise/core";
 import { SdkTransport } from "@bandwise/system-one-client";
-import { BUNDLED_FIXTURES_DIR, type Fixture, loadBundledFixtures } from "@bandwise/system-one-client/fixture";
+import { BUNDLED_FIXTURES_DIR, type Fixture, loadProviderFixtures } from "@bandwise/system-one-client/fixture";
 import { PROVIDER_KEY_ENV } from "../ports.js";
 import { RecordPlanError, planRecording, recordFixtures } from "./record.js";
 import { runSmoke, smokeList } from "./smoke.js";
@@ -100,7 +100,7 @@ export async function recordMain(argv: readonly string[], io: LiveIo): Promise<n
   const routes = io.routes ?? SEED_MODEL_ROUTES;
   let targets;
   try {
-    targets = planRecording(io.fixtures ?? loadBundledFixtures(), p.provider, profiles, routes, p.model);
+    targets = planRecording(io.fixtures ?? loadProviderFixtures(p.provider), p.provider, profiles, routes, p.model);
   } catch (e) {
     if (e instanceof RecordPlanError) {
       io.err(`fixtures:record: ${e.message}`);
