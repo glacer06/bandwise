@@ -266,27 +266,52 @@ describe("hook input mapping", () => {
     expect(mapHookInput("UserPromptSubmit", { prompt: wake }, () => "")).toEqual({ kind: "skip" });
   });
 
-  it("skips a compaction summary: it recaps old tasks and is not a request", () => {
+  it("skips a compaction summary by its flags, not its text", () => {
     const line = (x: unknown): string => JSON.stringify(x);
     const wake = "<task-notification>\n<task-type>queued-remote-notifications</task-type>\n<status>pending</status>\n</task-notification>";
-    const summary = "This session is being continued from a previous conversation that ran out of context.\n\nSummary:\n1. Primary Request: ship the release, email the reviewer, fix the docs.";
     const typed = line({ type: "user", timestamp: "2026-10-15T17:00:00.000Z", message: { content: "merge the PR once CI is green" } });
-    const afterCompaction = [
+    const reply = line({ type: "assistant", message: { id: "m1", content: [{ type: "text", text: "Watching CI." }] } });
+    const tail = (summary: Record<string, unknown>): string[] => [
       line({ type: "system", subtype: "compact_boundary", content: "Conversation compacted" }),
-      line({ type: "user", isCompactSummary: true, isVisibleInTranscriptOnly: true, timestamp: "2026-10-15T17:30:00.000Z", message: { content: summary } }),
+      line({ type: "user", timestamp: "2026-10-15T17:30:00.000Z", message: { content: "Summary of earlier work: shipped the release, emailed the reviewer, fixed the docs." }, ...summary }),
       line({ type: "user", timestamp: "2026-10-15T17:40:00.000Z", message: { content: wake } }),
       line({ type: "assistant", message: { id: "m2", content: [{ type: "text", text: "CI is still running. Waiting." }] } }),
     ];
-    const t = [typed, line({ type: "assistant", message: { id: "m1", content: [{ type: "text", text: "Watching CI." }] } }), ...afterCompaction].join("\n");
-    expect(lastExchange(t)).toEqual({ request: "merge the PR once CI is green", lastReply: "CI is still running. Waiting." });
-    expect(taskStats(t)?.requestAt).toBe(Date.parse("2026-10-15T17:00:00.000Z"));
-    // A summary line without the flags is still known by its opening text.
-    const unflagged = t.replace('"isCompactSummary":true,"isVisibleInTranscriptOnly":true,', "");
-    expect(unflagged).not.toContain("isCompactSummary");
-    expect(lastExchange(unflagged).request).toBe("merge the PR once CI is green");
+    // Either flag alone marks the summary; its text matches nothing the hook knows.
+    for (const flags of [{ isCompactSummary: true, isVisibleInTranscriptOnly: true }, { isCompactSummary: true }, { isVisibleInTranscriptOnly: true }]) {
+      const t = [typed, reply, ...tail(flags)].join("\n");
+      expect(lastExchange(t)).toEqual({ request: "merge the PR once CI is green", lastReply: "CI is still running. Waiting." });
+      expect(taskStats(t)?.requestAt).toBe(Date.parse("2026-10-15T17:00:00.000Z"));
+    }
     // With no typed request left in the tail, the Stop has no request and is skipped.
-    expect(lastExchange(afterCompaction.join("\n"))).toEqual({ request: undefined, lastReply: "CI is still running. Waiting." });
-    expect(mapHookInput("Stop", { transcript_path: "/t.jsonl" }, () => afterCompaction.join("\n"))).toEqual({ kind: "skip" });
+    const onlyAfter = tail({ isCompactSummary: true }).join("\n");
+    expect(lastExchange(onlyAfter)).toEqual({ request: undefined, lastReply: "CI is still running. Waiting." });
+    expect(mapHookInput("Stop", { transcript_path: "/t.jsonl" }, () => onlyAfter)).toEqual({ kind: "skip" });
+    // A typed prompt that starts like a summary, such as one pasted into a new session, is a request.
+    const pasted = "This session is being continued from a previous conversation. Finish step 3 and run the tests.";
+    const t2 = [typed, reply, line({ type: "user", message: { content: pasted } }), line({ type: "assistant", message: { id: "m3", content: [{ type: "text", text: "Step 3 is done." }] } })].join("\n");
+    expect(lastExchange(t2).request).toBe(pasted);
+    expect(mapHookInput("UserPromptSubmit", { prompt: pasted }, () => "")).toEqual({ kind: "run", candidate: { prompt: pasted } });
+  });
+
+  it("skips Claude Code's interrupt marker: nobody typed it", () => {
+    const line = (x: unknown): string => JSON.stringify(x);
+    const wake = "<task-notification>\n<task-type>queued-remote-notifications</task-type>\n</task-notification>";
+    for (const marker of [
+      { type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user]" }] } },
+      { type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user for tool use]" }] } },
+      { type: "user", toolDenialKind: "interrupted", message: { content: [{ type: "text", text: "Stopped." }] } },
+    ]) {
+      const t = [
+        line({ type: "user", timestamp: "2026-10-15T18:00:00.000Z", message: { content: "rerun the release check" } }),
+        line({ type: "assistant", message: { id: "m1", content: [{ type: "text", text: "Running it." }] } }),
+        line(marker),
+        line({ type: "user", message: { content: wake } }),
+        line({ type: "assistant", message: { id: "m2", content: [{ type: "text", text: "CI is still running. Waiting." }] } }),
+      ].join("\n");
+      expect(lastExchange(t)).toEqual({ request: "rerun the release check", lastReply: "CI is still running. Waiting." });
+      expect(taskStats(t)?.requestAt).toBe(Date.parse("2026-10-15T18:00:00.000Z"));
+    }
   });
 
   it("knows a harness envelope only by its opening tag", () => {
@@ -297,9 +322,7 @@ describe("hook input mapping", () => {
     expect(isHarnessEnvelope("<wakeful> is not a tag we write")).toBe(false);
     expect(isHarnessEnvelope("Fix the <task-notification> parser")).toBe(false);
     expect(isHarnessEnvelope("<system-reminder>")).toBe(false);
-    expect(isHarnessEnvelope("This session is being continued from a previous conversation that ran out of context.")).toBe(true);
-    expect(isHarnessEnvelope("<artifact-content-authored-by-others/>\nThe summarized conversation included")).toBe(true);
-    expect(isHarnessEnvelope("Summarize this session for me")).toBe(false);
+    expect(isHarnessEnvelope("This session is being continued from a previous conversation that ran out of context.")).toBe(false);
   });
 
   it("reads a launch profile only when it looks like a profile id", () => {

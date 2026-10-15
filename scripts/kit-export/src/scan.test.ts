@@ -28,6 +28,8 @@ describe("scanText", () => {
     ["references/api.md", "ref.internal-doc"],
     ["// docs/PLAN.md Open items", "ref.internal-doc"],
     ["see `docs/adr-notes/PLAN.md`", "ref.internal-doc"],
+    ["see ./docs/PLAN.md", "ref.internal-doc"],
+    ["[plan](../../docs/PLAN.md)", "ref.internal-doc"],
     ["password failed for user bandwise_console", "db.internal-role"],
     ["GRANT bandwise_app TO x", "db.internal-role"],
     ["mail ops@company.com", "secret.email"],
@@ -67,6 +69,9 @@ describe("scanText", () => {
   it("uses extra internal doc names", () => {
     expect(rules("see team-notes.md", ["team-notes.md"])).toEqual(["ref.internal-doc"]);
     expect(rules("see `docs/runbooks/dogfood.md` section 3.", ["dogfood.md"])).toEqual(["ref.internal-doc"]);
+    expect(rules("[runbook](../../docs/runbooks/dogfood.md)", ["dogfood.md"])).toEqual(["ref.internal-doc"]);
+    expect(rules("pool sizes (runbooks/database.md)", ["database.md"])).toEqual(["ref.internal-doc"]);
+    expect(rules(".claude/skills/x/references/api.md", [])).toContain("ref.internal-doc");
     expect(rules("see team-notes.md")).toEqual([]);
   });
 

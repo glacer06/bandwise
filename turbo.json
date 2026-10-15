@@ -181,6 +181,7 @@
         "$TURBO_ROOT$/packages/templates/**",
         "$TURBO_ROOT$/packages/config/**",
         "$TURBO_ROOT$/plugins/claude-code/**",
+        "$TURBO_ROOT$/.bandwise/**",
         "$TURBO_ROOT$/.claude/skills/bandwise-builder/**",
         "$TURBO_ROOT$/docs/**",
         "$TURBO_ROOT$/pnpm-workspace.yaml"
@@ -194,7 +195,8 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.claude/skills/bandwise-builder/templates/**",
-        "$TURBO_ROOT$/packages/system-one-client/fixtures/**"
+        "$TURBO_ROOT$/packages/system-one-client/fixtures/**",
+        "$TURBO_ROOT$/.bandwise/**"
       ],
       "outputs": []
     }

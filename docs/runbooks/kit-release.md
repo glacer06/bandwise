@@ -51,7 +51,7 @@ Read every changed file, not only the scan result. The scanner is a floor. Look 
 
 ## 4. Version, push and tag
 
-1. Set `KIT_VERSION` in `scripts/kit-export/src/export.ts` (all four packages share it). In the same change, move the `@bandwise/cli@<version>` pin in `plugins/claude-code/hooks/hooks.json` and `plugins/claude-code/README.md` to that version, and bump `version` in `plugins/claude-code/.claude-plugin/plugin.json` so installed copies pick up the new pin. A kit-export test fails when the pin and `KIT_VERSION` differ. Merge that in the monorepo, and regenerate.
+1. Set `KIT_VERSION` in `scripts/kit-export/src/export.ts` (all four packages share it). In the same change, move the `@bandwise/cli@<version>` pin in `plugins/claude-code/hooks/hooks.json`, `plugins/claude-code/README.md` and `docs/runbooks/bandwise-gate.md` (the install check) to that version, and bump `version` in `plugins/claude-code/.claude-plugin/plugin.json` so installed copies pick up the new pin. A kit-export test fails when the pin and `KIT_VERSION` differ. Merge that in the monorepo, and regenerate.
 2. In the kit clone, commit on `main` with a plain message ("Release 0.1.1: ..."), and push. CI runs lint, typecheck, test, build and a local run on Node 22.
 3. Tag the same commit and push the tag:
 

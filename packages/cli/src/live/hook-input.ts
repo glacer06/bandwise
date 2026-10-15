@@ -66,21 +66,30 @@ function textOf(content: unknown): string {
  */
 const HARNESS_ENVELOPE = /^<(?:task-notification|wake|webhook-payload|child-session-event)[\s>]/;
 
-/**
- * The summary Claude Code writes when it compacts a long session. It is a user turn too, and it
- * recaps every earlier task, so read as the request it makes a correct "still waiting on CI" reply
- * look like work left. Transcript lines mark it (harnessEntry); the opening text is the fallback.
- */
-const COMPACTION_SUMMARY = /^(?:This session is being continued from a previous conversation\b|<artifact-content-authored-by-others\/>)/;
-
 export function isHarnessEnvelope(text: string): boolean {
-  const t = text.trimStart();
-  return HARNESS_ENVELOPE.test(t) || COMPACTION_SUMMARY.test(t);
+  return HARNESS_ENVELOPE.test(text.trimStart());
 }
 
-/** Transcript lines that are not the conversation: meta lines, subagent lines and compaction summaries. */
+/**
+ * Transcript lines that are not the conversation: meta lines, subagent lines, and the summary
+ * Claude Code writes when it compacts a long session. That summary is a user line that recaps
+ * every earlier task, so read as the request it makes a correct "still waiting on CI" reply look
+ * like work left. Claude Code flags it; its text is not used, so a typed prompt that happens to
+ * start like a summary is still a request.
+ */
 function harnessEntry(entry: Record<string, unknown>): boolean {
   return entry["isMeta"] === true || entry["isSidechain"] === true || entry["isCompactSummary"] === true || entry["isVisibleInTranscriptOnly"] === true;
+}
+
+/**
+ * The marker Claude Code writes as a user line when the user stops a turn ("[Request interrupted
+ * by user]", or "... for tool use]"). Nobody typed it, so it is not a request either.
+ */
+const INTERRUPT_MARKER = /^\[Request interrupted by user\b/;
+
+/** A user line's text that is not a request: a harness envelope or an interrupt marker. */
+function notARequest(entry: Record<string, unknown>, text: string): boolean {
+  return isHarnessEnvelope(text) || entry["toolDenialKind"] === "interrupted" || INTERRUPT_MARKER.test(text);
 }
 
 /**
@@ -102,7 +111,7 @@ export function lastExchange(transcript: string): { request: string | undefined;
     const text = textOf(entry["message"]["content"]).trim();
     if (text === "") continue;
     if (entry["type"] === "user") {
-      if (isHarnessEnvelope(text)) continue;
+      if (notARequest(entry, text)) continue;
       request = text;
       lastReply = undefined;
     } else if (entry["type"] === "assistant") {
@@ -142,7 +151,7 @@ export function taskStats(transcript: string): TaskStats | null {
     const content = entry["message"]["content"];
     if (entry["type"] === "user") {
       const text = textOf(content).trim();
-      if (text === "" || isHarnessEnvelope(text)) continue; // A tool result or a harness message, not a request.
+      if (text === "" || notARequest(entry, text)) continue; // A tool result or a harness message, not a request.
       const at = typeof entry["timestamp"] === "string" ? Date.parse(entry["timestamp"]) : Number.NaN;
       stats = { requestAt: Number.isNaN(at) ? null : at, turns: 0, toolCalls: 0 };
       ids = new Set();

@@ -22,7 +22,7 @@ export interface GateResult {
   met: boolean;
 }
 
-/** An api.md error envelope, or one the client built for a failure that never reached the API. */
+/** An error envelope from the API (api.md), or one the client built for a failure that never reached the API. */
 export interface ApiError {
   /** HTTP status, or null when no answer came back. */
   status: number | null;

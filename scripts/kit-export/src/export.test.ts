@@ -161,7 +161,7 @@ describe("the bandwise-gate plugin", () => {
   // never reaches the plugin: CLI 0.3.0 kept reading cloud wake-ups as requests for nine days
   // after main had the fix. So the pin moves with KIT_VERSION, in the same change.
   it("pins the CLI version this kit releases, everywhere it names one", () => {
-    for (const rel of ["plugins/claude-code/hooks/hooks.json", "plugins/claude-code/README.md"]) {
+    for (const rel of ["plugins/claude-code/hooks/hooks.json", "plugins/claude-code/README.md", "docs/runbooks/bandwise-gate.md"]) {
       const text = readFileSync(join(REPO_ROOT, rel), "utf8");
       const pins = [...text.matchAll(/@bandwise\/cli@([0-9][^\s"`]*)/g)].map((m) => m[1]);
       expect(pins.length, rel).toBeGreaterThan(0);

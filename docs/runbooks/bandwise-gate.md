@@ -18,7 +18,7 @@ The plugin depends on two things that are not in this repo:
 
 2. **D2e live (Nick).** The hooks call `POST https://app.bandwise.dev/api/v1/sets/<slug>/run`, and the MCP entry points at `https://app.bandwise.dev/mcp`. Both need hosted dogfood turned on, as in [hosted-dogfood.md](hosted-dogfood.md). `/mcp` also needs ADR-021 rollout step 1 (the remote MCP slice) merged and deployed. Before that, the hooks still work once D2e is live, and the MCP tools fail to connect.
 
-You also need Claude Code with `claude plugin validate`, and Node 22 or later.
+You also need Claude Code with `claude plugin validate`, Node 22 or later, and bash or zsh for the hooks (macOS, Linux, or Windows with Git Bash). Each hook command clears the provider keys with a `NAME= command` prefix, which PowerShell does not support. A later CLI release can replace that prefix with a `--hosted-only` flag on `bandwise hook`.
 
 ## 1. Validate
 
