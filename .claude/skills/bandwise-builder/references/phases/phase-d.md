@@ -64,6 +64,21 @@ The first plugin: a Claude Code plugin and a remote MCP connector that check whe
 - [ ] Step 3: two to four weeks on `internal` in shadow with the parallel Haiku baseline, then the section 6 bar, read by Nick.
 - [ ] Step 4: OAuth 2.1 (CIMD, one org per grant), its own PR, PJ's Security review before merge.
 
+## D5: Jev 1.14 (from 2026-10-14)
+
+TypeSafe made `jev-1.14.0` available on 2026-10-14 and points `jev-preview` at it. `jev-latest` still points to `jev-1.13.0`, so Bandwise treats 1.14 as a preview model; `models.md` lists it under Current models and does not use the word. Every dogfood set stays pinned to `jev-1.13.0` until the items below are done and `jev-latest` moves. Every local run on a 1.14 copy passes `--rollout shadow`, because `bandwise run --live` defaults to `full`. The path, its rules and what is not adopted are in `docs/PLAN.md`, Jev 1.14. The commands are in `docs/runbooks/dogfood.md`, Jev 1.14 (D5). TypeSafe's 1.14 blog post could not be read on 2026-10-15; these items rest on `models.md`, `openapi.json` and the SDK changelogs.
+
+- [x] Registry data, built 2026-10-15: a `jev-1.14.0` row (versioned, `preview`, `releaseDate` 2026-10-14, 64,000 tokens per request and 32,000 for state plus the longest question, noul, choice and score, text, all twelve 1.13 weakness ids until a 1.14 jaggedness page exists, and `rpm` and `tokensPerSec` repeating 1.13's last published values with a comment), its price row (42,000 micro-USD per million input tokens, output 0), `jev-preview` pointed at it, and the `models.md` and `llms.txt` contract snapshots refreshed. `jev-latest` and the platform default stay on `jev-1.13.0`. The `openapi.json` snapshot waits for the `box` and images decision
+- [ ] Nick, from his shell: `pnpm fixtures:record --model jev-1.14.0`, `pnpm smoke` (expect `jev-preview` answered by `jev-1.14.0`) and `pnpm smoke --model jev-1.14.0`. Commit the fixtures, and put cost and latency in `docs/runbooks/dogfood.md`. Re-record the stand-in registry fixtures (`typesafe-models.json`, `typesafe-probe-jev-latest.json`, `typesafe-probe-jev-preview.json` in `apps/console/src/jobs/registry/__fixtures__/http/`) with the same key
+- [ ] Labeled datasets for the four dogfood sets, outside the repo in `~/.bandwise/evals/internal/`: the example and borderline states plus real states from `/runs`, every label set or confirmed by Nick
+- [ ] Same-snapshot eval per set with `--transport sdk --repeats 3`: `jev-1.13.0` first, then `--snapshot <id> --model jev-1.14.0`. The aggregate numbers (precision and lower bound per band, coverage, review load, ECE, stability) go in `dogfood.md`, never the cases
+- [ ] Threshold re-check per question on the 1.14 answers. Thresholds tuned on 1.13 are not assumed to carry over; a change goes into the 1.14 copy of the spec only, never `.bandwise/sets/`
+- [ ] Decision (Nick), optional: hosted `<set>-challenger` copies on `jev-1.14.0` in `shadow` for a week. Not before an ADR-008 amendment adds a rule that keeps a `preview` model out of `controlled` and `full` in both the publish lints and `planRollout`. Then the `internal` org's preview opt-in with an audit row, a re-minted run-only hook token that covers the challenger sets (PJ's audit check), and second hook entries with `--remote-set`, approved by Nick
+- [ ] Repin, after `jev-latest` points to `jev-1.14.0` and the evals pass: the sets still in `shadow` first, each as a new version with a commit to `.bandwise/sets/`, then `model-tier` last, with the eval evidence named in its changelog. Until then no set runs `jev-1.14.0` past `shadow`
+- [ ] After the repins, in one PR: the kit templates, the `bandwise-gate` plugin sets, the docs examples and the platform default move to `jev-1.14.0` together (the plugin sets reach users with the next `@bandwise/cli` release), and `jev-1.13.0` becomes `deprecated` once TypeSafe names a retire date
+
+Separate from D5: `model-tier` moves to `controlled` on `jev-1.13.0` when Nick reads its receipts (NSI-735). It does not wait for 1.14 and does not move with it.
+
 ## Exit gate
 - A week of receipts from real Claude Code sessions on this repo, with `bandwise report` showing System One spend and estimated savings per set.
 - At least one set moved from `shadow` to `controlled` by Nick.

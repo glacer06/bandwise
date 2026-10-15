@@ -31,7 +31,7 @@ This skill is the rulebook for the agent team building it. This skill is interna
 | **System One model** | Any TypeSafe model served by `POST /v1/systemone` and picked by the `model` field. Jev is the first family. |
 | **Model profile** | A registry row in `system_one_models`: limits, question types, status, weaknesses. See `references/system-one-models.md`. |
 | **Provider** | Who serves a System One call: `typesafe` (direct), `openrouter` (ADR-011, proposed) or `vercel` (Vercel AI Gateway, ADR-013). Picked per org and per set. A `ModelRoute` row says how a model is reached through a provider other than TypeSafe: the id sent, the limits, and whether it is pinned. |
-| **Pinned model** | A registry ID of kind `versioned` (for example `jev-1.13.0`). Aliases such as `jev-latest`, partial IDs such as `jev` or `jev-1.13`, and unknown names are moving. |
+| **Pinned model** | A registry ID of kind `versioned` (for example `jev-1.13.0`, or `jev-1.14.0`, which is pinned though its status is `preview`). Aliases such as `jev-latest`, partial IDs such as `jev` or `jev-1.13`, and unknown names are moving. |
 | **Operation** | One management capability with id `noun.verb` (for example `set.publish`). One handler behind the console, the API, the CLI and MCP. |
 | **Job** | Long-running work started by an operation. Returns `202 { jobId }`; poll `GET /api/v1/jobs/{id}`. |
 | **Agent token** | `sa_live_` token that belongs to one user in one org. Scoped. Effective role = min(role ceiling, current membership role). |
@@ -70,8 +70,8 @@ Our wrapper contract is in `references/system-one-api-contract.md`. Model facts 
 - Install the official skill once per machine:
   `claude plugin marketplace add typesafe-ai/skills` then `claude plugin install typesafe@typesafe-ai`
 - Read the live docs index before changing any System One payload: `https://docs.typesafe.ai/llms.txt`. Append `.md` to any docs page for Markdown.
-- The machine-readable source is `https://api.typesafe.ai/openapi.json` (info.version 0.2.0 on 2026-09-26). The contract watch job diffs it nightly.
-- Pages you will use most: `/api.md`, `/models.md`, `/confidence.md`, `/primitives.md`, `/primitives/advanced.md`, `/concepts/how-to-build-with-system-one.md`, `/model-jaggedness/jev-1.13.md`, `/patterns.md`, `/patterns/fan-out.md`, `/cookbooks.md`, `/cookbooks/consistency_choice_cookbook.md`, `/sdk/javascript.md`, `/sdk/python/usage.md`.
+- The machine-readable source is `https://api.typesafe.ai/openapi.json`. On 2026-10-15 it still says info.version 0.2.0, but TypeSafe added the `box` question type and request `assets` in place, so a matching version does not mean a matching contract. The contract watch job diffs it against the committed snapshot. It is not scheduled yet: the nightly run lands with the Phase 2 job runner.
+- Pages you will use most: `/api.md`, `/models.md`, `/confidence.md`, `/primitives.md`, `/primitives/advanced.md`, `/concepts/how-to-build-with-system-one.md`, `/model-jaggedness/jev-1.13.md` (there is no Jev 1.14 page yet), `/patterns.md`, `/patterns/fan-out.md`, `/cookbooks.md`, `/cookbooks/consistency_choice_cookbook.md`, `/sdk/javascript.md`, `/sdk/python/usage/basic.md`.
 
 System One models are not fine-tuned per tenant. Improvement comes from instructions, criteria, state shaping, thresholds, stages and composites. Do not plan a fine-tuning feature.
 
