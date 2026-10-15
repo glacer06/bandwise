@@ -8,12 +8,12 @@ class Named extends Error {
 
 describe("errorType", () => {
   it("prints the name, never the message", () => {
-    expect(errorType(new Named("password hunter2 for user bandwise_console"))).toBe("Named");
+    expect(errorType(new Named("password hunter2 for user app_user"))).toBe("Named");
     expect(errorType(new TypeError("state text"))).toBe("TypeError");
   });
 
   it("follows the cause chain and prints safe codes", () => {
-    // The 2026-10-05 shape: a connection error over node-postgres' plain SASL Error.
+    // A connection error that wraps node-postgres' plain SASL Error.
     const sasl = new Error('SASL: SCRAM-SERVER-FINAL-MESSAGE: server returned error: "password authentication failed"');
     const top = Object.assign(new Error("The database connection failed: auth_failed.", { cause: sasl }), { name: "DbConnectionError", code: "auth_failed" });
     expect(errorType(top)).toBe("DbConnectionError auth_failed < Error");

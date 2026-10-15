@@ -11,7 +11,7 @@ import { kitReadme, packageReadme, type ReadmeTemplate } from "./readme.js";
 import { type RewriteCounts, dropTests, rewriteComments, rewriteTestTitles } from "./rewrite.js";
 import { DEFAULT_INTERNAL_DOC_NAMES, type ScanFinding, scanTree } from "./scan.js";
 
-export const KIT_VERSION = "0.3.0";
+export const KIT_VERSION = "0.4.0";
 export const KIT_REPO = "glacer06/bandwise-kit";
 export const KIT_HOMEPAGE = "https://docs.bandwise.dev";
 
@@ -70,6 +70,12 @@ interface Patch {
 
 /** Exact edits to single kit files. Each must match exactly once, so drift fails the export. */
 const PATCHES: readonly Patch[] = [
+  {
+    file: ".bandwise/README.md",
+    find: "; see `docs/runbooks/dogfood.md` section 3.",
+    replace: ".",
+    why: "the hosted-mode runbook is internal and not in the kit",
+  },
   {
     file: "packages/cli/src/local/main.test.ts",
     find: 'at("../examples/email-triage.state.json")',

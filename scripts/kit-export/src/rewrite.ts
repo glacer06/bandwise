@@ -26,7 +26,9 @@ export function internalRefSource(internalDocNames: readonly string[]): string {
   const quoted = String.raw`(?:,?\s+"[^"\n]*")?`;
   const parts = [
     String.raw`ADR-\d+(?:\s+Amendment\s+\d+)?(?:'s\s+[A-Z][\w-]*(?:\s+section)?)?${section}`,
-    String.raw`(?:\.claude\/[\w./-]*)`,
+    // Claude Code's own .claude/settings.json and the public find-decisions skill folder are
+    // fine in the kit (the scanner allows them too). A path never takes a trailing period.
+    String.raw`(?:\.claude\/(?!settings\.json(?![\w/-]))(?!skills\/?(?:find-decisions\/?)?(?![\w/.-]))[\w-]+(?:[./][\w-]+)*\/?)`,
     String.raw`(?:references\/)?(?:phases\/)?phase-\d+b?\.md${section}`,
     ...(docs === "" ? [] : [String.raw`(?:references\/|(?<![\w/.-]))(?:${docs})${section}${quoted}`]),
     String.raw`golden rule \d+`,

@@ -94,17 +94,21 @@ function textRules(internalDocNames: readonly string[]): TextRule[] {
     { rule: "ref.docs-adr", re: /docs\/adr\b/g },
     { rule: "ref.phase-doc", re: /\bphase-\d+b?\.md\b/g },
     { rule: "ref.internal-skill", re: /\bbandwise-builder\b/g },
-    // An internal doc named on its own or under references/. A public URL such as
-    // https://docs.typesafe.ai/api.md is fine, so a name right after a slash or a dot is ignored,
-    // unless the slash is the one in references/.
+    // An internal doc named on its own, under references/ or runbooks/, or under a docs/ path
+    // such as docs/runbooks/x.md, ./docs/PLAN.md or ../../docs/x.md. A public URL such as
+    // https://docs.typesafe.ai/api.md is fine, so a name right after any other slash or a dot is
+    // ignored, and so is a docs/ folder inside a URL path. A references/ or runbooks/ folder is
+    // flagged anywhere, URLs included: failing closed costs one phrase in the export.
     ...(escaped.length === 0
       ? []
       : [
           {
             rule: "ref.internal-doc",
-            re: new RegExp(`(?:references\\/|(?<![\\w./-]))(?:${escaped.join("|")})(?![\\w-])`, "g"),
+            re: new RegExp(`(?:(?:references|runbooks)\\/|(?<![\\w./:-])(?:\\.\\.?\\/)*docs\\/(?:[\\w-]+\\/)*|(?<![\\w./-]))(?:${escaped.join("|")})(?![\\w-])`, "g"),
           },
         ]),
+    // The hosted database's login and group roles.
+    { rule: "db.internal-role", re: /\bbandwise_(?:console|app|platform)\w*\b/g },
     {
       rule: "secret.email",
       re: /[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})\b/g,

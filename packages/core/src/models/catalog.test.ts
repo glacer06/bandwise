@@ -66,7 +66,7 @@ describe("seed catalog", () => {
       releaseDate: "2026-10-14",
       retireAt: null,
       questionTypes: ["noul", "choice", "score"],
-      // rpm and tokensPerSec repeat jev-1.13.0's last published values until the ADR-008 amendment.
+      // rpm and tokensPerSec repeat jev-1.13.0's last published values until per-organization limits are modeled.
       limits: { requestTokens: 64_000, statePlusLongestQuestionTokens: 32_000, rpm: 1_200, tokensPerSec: 250_000 },
       inputModalities: ["text"],
       supersedes: [],

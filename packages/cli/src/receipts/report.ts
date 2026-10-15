@@ -56,7 +56,7 @@ const pct = (sorted: number[], p: number): number | null =>
 
 const round6 = (n: number): number => Math.round(n * 1e6) / 1e6;
 
-/** ADR-010 Amendment 1, with the old rule for receipts that carry no policy action. */
+/** Whether a receipt would act in controlled (ADR-010 Amendment 1), with the old rule for receipts that carry no policy action. */
 export function wouldActInControlled(r: Receipt): boolean {
   if (r.policyAction === undefined) return r.overallAction === "auto" && r.route !== null;
   return r.runBand === "high" && r.policyAction === "auto";

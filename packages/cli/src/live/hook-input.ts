@@ -71,6 +71,28 @@ export function isHarnessEnvelope(text: string): boolean {
 }
 
 /**
+ * Transcript lines that are not the conversation: meta lines, subagent lines, and the summary
+ * Claude Code writes when it compacts a long session. That summary is a user line that recaps
+ * every earlier task, so read as the request it makes a correct "still waiting on CI" reply look
+ * like work left. Claude Code flags it; its text is not used, so a typed prompt that happens to
+ * start like a summary is still a request.
+ */
+function harnessEntry(entry: Record<string, unknown>): boolean {
+  return entry["isMeta"] === true || entry["isSidechain"] === true || entry["isCompactSummary"] === true || entry["isVisibleInTranscriptOnly"] === true;
+}
+
+/**
+ * The marker Claude Code writes as a user line when the user stops a turn ("[Request interrupted
+ * by user]", or "... for tool use]"). Nobody typed it, so it is not a request either.
+ */
+const INTERRUPT_MARKER = /^\[Request interrupted by user\b/;
+
+/** A user line's text that is not a request: a harness envelope or an interrupt marker. */
+function notARequest(entry: Record<string, unknown>, text: string): boolean {
+  return isHarnessEnvelope(text) || entry["toolDenialKind"] === "interrupted" || INTERRUPT_MARKER.test(text);
+}
+
+/**
  * The last thing the user typed and the agent's final text, from a Claude Code transcript (JSONL).
  * Tool results, meta lines and harness envelopes are not user requests.
  */
@@ -85,11 +107,11 @@ export function lastExchange(transcript: string): { request: string | undefined;
     } catch {
       continue; // The first line of a tail read is usually cut.
     }
-    if (!isObj(entry) || !isObj(entry["message"]) || entry["isMeta"] === true || entry["isSidechain"] === true) continue;
+    if (!isObj(entry) || !isObj(entry["message"]) || harnessEntry(entry)) continue;
     const text = textOf(entry["message"]["content"]).trim();
     if (text === "") continue;
     if (entry["type"] === "user") {
-      if (isHarnessEnvelope(text)) continue;
+      if (notARequest(entry, text)) continue;
       request = text;
       lastReply = undefined;
     } else if (entry["type"] === "assistant") {
@@ -125,11 +147,11 @@ export function taskStats(transcript: string): TaskStats | null {
     } catch {
       continue;
     }
-    if (!isObj(entry) || !isObj(entry["message"]) || entry["isMeta"] === true || entry["isSidechain"] === true) continue;
+    if (!isObj(entry) || !isObj(entry["message"]) || harnessEntry(entry)) continue;
     const content = entry["message"]["content"];
     if (entry["type"] === "user") {
       const text = textOf(content).trim();
-      if (text === "" || isHarnessEnvelope(text)) continue; // A tool result or a harness message, not a request.
+      if (text === "" || notARequest(entry, text)) continue; // A tool result or a harness message, not a request.
       const at = typeof entry["timestamp"] === "string" ? Date.parse(entry["timestamp"]) : Number.NaN;
       stats = { requestAt: Number.isNaN(at) ? null : at, turns: 0, toolCalls: 0 };
       ids = new Set();

@@ -8,17 +8,17 @@ Steps marked **Nick** are Nick's. The rest either of you can run.
 
 The plugin depends on two things that are not in this repo:
 
-1. **`@bandwise/cli` 0.3 on npm (Nick).** The hooks run `npx -y @bandwise/cli@0.3.0` (pinned, and run from the plugin folder so no project can swap in its own copy), and 0.3.0 is the first release with hosted hook mode (`BANDWISE_TOKEN` set). 0.2.1, the current release, ignores the token and needs a TypeSafe key. Nick cuts the release the usual way: set `KIT_VERSION` to `0.3.0`, regenerate, push and tag, as in [kit-release.md](kit-release.md), section 4. Check it landed:
+1. **`@bandwise/cli` on npm at the pinned version (Nick).** The hooks run `npx -y @bandwise/cli@0.4.0` (pinned, and run from the plugin folder so no project can swap in its own copy). The pin always equals `KIT_VERSION` in `scripts/kit-export/src/export.ts`, and a kit-export test fails when they differ. 0.3.0 was the first release with hosted hook mode (`BANDWISE_TOKEN` set). 0.4.0 is the first that skips a cloud session's wake-ups (`<task-notification>` and the like) instead of reading them as the request; on 0.3.0 they were most of the `done-check` Stops (dogfood.md, Hosted read-out). Nick cuts each release the usual way: set `KIT_VERSION`, regenerate, push and tag, as in [kit-release.md](kit-release.md), section 4. Check it landed:
 
    ```sh
-   npm view @bandwise/cli@0.3.0 version
+   npm view @bandwise/cli@0.4.0 version
    ```
 
-   Until 0.3.0 is out, `npx` finds no matching version and each hook ends silently. Nothing breaks, but nothing runs either.
+   Until the pinned version is on npm, `npx` fails with `npm error code ETARGET` and exits 1. Claude Code shows that as a non-blocking hook error on each gated tool call and on each Stop. Nothing is blocked and nothing runs. So push the tag right after the pin change merges, and don't install or update the plugin (`claude plugin marketplace update bandwise`) until `npm view` above prints the version.
 
 2. **D2e live (Nick).** The hooks call `POST https://app.bandwise.dev/api/v1/sets/<slug>/run`, and the MCP entry points at `https://app.bandwise.dev/mcp`. Both need hosted dogfood turned on, as in [hosted-dogfood.md](hosted-dogfood.md). `/mcp` also needs ADR-021 rollout step 1 (the remote MCP slice) merged and deployed. Before that, the hooks still work once D2e is live, and the MCP tools fail to connect.
 
-You also need Claude Code with `claude plugin validate`, and Node 22 or later.
+You also need Claude Code with `claude plugin validate`, Node 22 or later, and bash or zsh for the hooks (macOS, Linux, or Windows with Git Bash). Each hook command clears the provider keys with a `NAME= command` prefix, which PowerShell does not support. A later CLI release can replace that prefix with a `--hosted-only` flag on `bandwise hook`.
 
 ## 1. Validate
 

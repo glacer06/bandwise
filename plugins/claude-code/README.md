@@ -20,7 +20,7 @@ claude plugin marketplace add glacer06/bandwise
 claude plugin install bandwise-gate@bandwise
 ```
 
-The hooks run `npx -y @bandwise/cli@0.3.0` from this plugin's own folder, so a project you open can never swap in its own copy of the CLI. The machine needs Node 22 or later and npm. The first hook call downloads the CLI; later calls use the npm cache.
+The hooks run `npx -y @bandwise/cli@0.4.0` from this plugin's own folder, so a project you open can never swap in its own copy of the CLI. The machine needs Node 22 or later, npm, and a POSIX shell for the hooks (bash or zsh: macOS, Linux, or Windows with Git Bash), because each hook clears the provider keys with a `NAME= command` prefix. Under PowerShell every hook call fails with a hook error and nothing runs. The first hook call downloads the CLI; later calls use the npm cache.
 
 ## Set the tokens
 
@@ -31,7 +31,7 @@ The hooks and the MCP server read separate variables, so the hooks never run wit
 
 Load both from your password manager or keychain in your shell profile. Never put a token in a file in a repository, and never paste it into a prompt.
 
-Without `BANDWISE_TOKEN` the hooks end silently and change nothing. Without `BANDWISE_MCP_TOKEN` the MCP server is refused and shows no tools.
+Without `BANDWISE_TOKEN` the hooks end silently and change nothing. The hook commands clear `TYPESAFE_API_KEY`, `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY` for their own process, so a provider key in your shell never makes them call System One on that key. Without `BANDWISE_MCP_TOKEN` the MCP server is refused and shows no tools.
 
 ## What leaves your machine
 

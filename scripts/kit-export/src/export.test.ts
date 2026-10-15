@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type ExportReport, KIT_VERSION, PUBLISHED_PACKAGES, exportKit, readCatalog } from "./export.js";
+import { type ExportReport, KIT_VERSION, PUBLISHED_PACKAGES, REPO_ROOT, exportKit, readCatalog } from "./export.js";
 
 let out = "";
 let report: ExportReport;
@@ -153,5 +153,36 @@ describe("exportKit", () => {
     expect(again.findings).toEqual([]);
     expect(existsSync(join(out, "stale.txt"))).toBe(false);
     expect(existsSync(join(out, "pnpm-lock.yaml"))).toBe(true);
+  });
+});
+
+describe("the bandwise-gate plugin", () => {
+  // The plugin runs the CLI from npm at an exact version. A fix that never reaches that version
+  // never reaches the plugin: CLI 0.3.0 kept reading cloud wake-ups as requests for nine days
+  // after main had the fix. So the pin moves with KIT_VERSION, in the same change.
+  it("pins the CLI version this kit releases, everywhere it names one", () => {
+    for (const rel of ["plugins/claude-code/hooks/hooks.json", "plugins/claude-code/README.md", "docs/runbooks/bandwise-gate.md"]) {
+      const text = readFileSync(join(REPO_ROOT, rel), "utf8");
+      const pins = [...text.matchAll(/@bandwise\/cli@([0-9][^\s"`]*)/g)].map((m) => m[1]);
+      expect(pins.length, rel).toBeGreaterThan(0);
+      expect(new Set(pins), rel).toEqual(new Set([KIT_VERSION]));
+    }
+  });
+
+  // Without BANDWISE_TOKEN the CLI falls back to local live mode, which calls System One on any
+  // provider key it finds. The plugin is hosted only, so each hook clears those keys first.
+  it("runs every hook hosted only, with the provider keys cleared", () => {
+    const hooks = JSON.parse(readFileSync(join(REPO_ROOT, "plugins/claude-code/hooks/hooks.json"), "utf8")) as {
+      hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+    };
+    const commands = Object.values(hooks.hooks).flatMap((groups) => groups.flatMap((g) => g.hooks.map((h) => h.command)));
+    expect(commands.length).toBeGreaterThan(0);
+    for (const command of commands) {
+      const npx = command.indexOf("npx ");
+      expect(npx, command).toBeGreaterThan(0);
+      for (const key of ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY", "AI_GATEWAY_API_KEY"]) {
+        expect(command.slice(0, npx), `${key} in ${command}`).toMatch(new RegExp(`(?:^|\\s)${key}= `));
+      }
+    }
   });
 });

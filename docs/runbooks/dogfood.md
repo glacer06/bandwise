@@ -40,6 +40,24 @@ The three dogfood hooks are wired in this repo's `.claude/settings.json`, all in
 
 To move the hooks from your own key to app.bandwise.dev, follow [hosted-dogfood.md](hosted-dogfood.md) in order: migrations, the Vercel env, `bootstrap-internal` for the `internal` org and the `.bandwise/sets/` specs, the minted tokens, the checks, and the rollback plan. It marks which steps need PJ. Hosted mode went live on 2026-10-05: the hooks on this repo call app.bandwise.dev with the run-only hook token, every set still in `shadow`.
 
+## Hosted read-out (2026-10-07 to 2026-10-15)
+
+Read from the `runs` table for the `internal` org on 2026-10-15: 3,717 runs, no errors, every set in `shadow` on `jev-1.13.0`. System One cost $0.21. The counterfactual for the same questions on the comparator model was $3.82.
+
+- `action-risk-gate`: 3,359 runs. 3,065 would allow in `controlled` (high band, policy action `auto`) and 3 would ask. None of them is labeled yet, so the precision of those allows is unknown.
+- `model-tier`: 136 runs. Only 4 would act in `controlled`, all `hard`. 122 sit at `mechanical` in the medium band, so moving the set to `controlled` now would change about one prompt in 34. It waits for labeled prompts and a threshold check on that question (D5, labeled datasets) before it moves.
+- `done-check`: 222 runs, all through the `sims-hooks` token. In 150 of them the request is a cloud session's `<task-notification>` wake-up, and 61 of the 76 Stops it would block are among them. Those runs came from `@bandwise/cli@0.3.0`, which the `bandwise-gate` plugin pinned. It was published on 2026-10-02, four days before the envelope skip (`isHarnessEnvelope`) merged, so the skip never reached the plugin. The hosted `done-check` also still serves version 1 of 2026-10-05, from before the `waiting_on_event` outcome.
+
+The fix is kit 0.4.0 with the plugin pinned to it. It skips the wake-ups, the summary Claude Code writes when it compacts a long session, and the marker it writes when a turn is interrupted. Replayed over one long cloud session's transcript (685 Stops), 0.3.0 used a wake-up as the request on 432 Stops and a compaction summary on 14. 0.4.0 uses none of them: it reads the typed request on 629 Stops and skips the 56 that have no typed request left in the part of the transcript it reads. Then publish the current `.bandwise/sets/done-check.json` as a new hosted version at `shadow`:
+
+```sh
+bwa spec push .bandwise/sets/done-check.json --set done-check
+bwa spec diff .bandwise/sets/done-check.json
+bwa publish done-check --changelog "waiting_on_event and the wake-up skip"
+```
+
+`bwa rollback done-check` steps back, as in [hosted-dogfood.md](hosted-dogfood.md), section 8. For every run before the release, and any after it: a `done-check` run whose request starts with a harness envelope (`<task-notification>`, `<wake`, `<webhook-payload>` or `<child-session-event>`) a compaction summary ("This session is being continued from a previous conversation" or `<artifact-content-authored-by-others/>`), or an interrupt marker ("[Request interrupted by user") is not a labeled Stop. It never counts toward ADR-021's 200 labeled Stops or its precision bar.
+
 ## Jev 1.14 (D5)
 
 TypeSafe made `jev-1.14.0` available on 2026-10-14 and points `jev-preview` at it. `jev-latest` still points to `jev-1.13.0`, so Bandwise treats 1.14 as a preview model, and every set here stays on `jev-1.13.0` until Nick repins it. The plan is in `docs/PLAN.md`, Jev 1.14, and the checklist is D5 in phase-d.md. Nothing below changes what the hooks run, and nothing below writes to `.bandwise/sets/`.
